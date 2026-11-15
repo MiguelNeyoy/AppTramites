@@ -21,9 +21,10 @@ tags:
 * **Base de datos y tipos:** Esquema, seeds y políticas RLS desplegados en Supabase Self-Hosted (`192.168.1.75`, Studio en `:54323`); `.env` configurado y tipos generados en `src/types/database.types.ts`.
 * **Esqueleto del proyecto:** Capa de datos centralizada por recurso/tabla (`src/services/`), features ligeras para UI y hooks (`src/features/{auth,actas,tramites,fichas,dashboard,catalogos}/{components,hooks}`), cliente tipado (`src/lib/supabase.ts`), `useTheme` claro/oscuro (`src/app/useTheme.ts`), alias `@/` y base PWA (`vite-plugin-pwa` en `vite.config.ts`).
 * **Sistema de diseño e UI base:** Tokens HSL en `src/index.css` y `tailwind.config.js`, Shadcn UI (`components.json`, `src/lib/utils.ts`) con 13 componentes instalados en `src/components/ui/` (Radix, Lucide, Sonner, next-themes). `tsc -b`, `lint` y `build` pasando en limpio.
+* **UI del Login (Issue #2):** Vista split-screen minimalista con escudo oficial UAS (`src/assets/uas-escudo.png`) implementada en `src/features/auth/components/LoginPage.tsx` usando `Card`, `Input`, `Label`, `Checkbox` y `Button` de `shadcn/ui`, sin lógica de autenticación aún.
 
 **Dónde nos quedamos (Pendiente inmediato):**
-1. **Siguiente módulo:** Implementar `src/features/auth` (contexto/hook `useAuth`, carga de rol desde `perfiles` y pantalla de login institucional).
+1. **Siguiente módulo (Issue #1):** Implementar lógica de `src/features/auth` (contexto/hook `useAuth`, carga de rol desde `perfiles`, protección de rutas y conexión real de `LoginPage`).
 2. **Módulos funcionales:** Tablero de 8 trámites generales, módulo transversal de Fichas de Nuevo Ingreso, checklist semestral de Actas, métricas/catálogos y exportación `.xlsx` con ExcelJS.
 3. **Pendientes menores de setup:** Agregar iconos PWA (`pwa-192x192.png`, `pwa-512x512.png` referenciados en `vite.config.ts`) y cambiar `require("tailwindcss-animate")` a `import` ESM en `tailwind.config.js` (línea 104) si genera aviso en editor/Node.
 

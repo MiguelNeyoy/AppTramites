@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   FileEdit,
+  Filter,
   Plus,
   Search,
 } from 'lucide-react'
@@ -22,6 +23,8 @@ import {
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { NivelFilter } from '@/features/dashboard/components/dashboardMockData'
@@ -48,10 +51,10 @@ interface EditingTargetState {
 export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
   const [tipoActa, setTipoActa] = React.useState<TipoActaKey>('ORDINARIA')
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [soloPendientes, setSoloPendientes] = React.useState(false)
   const [programasState, setProgramasState] = React.useState<ProgramaChecklistItem[]>(
     () => buildInitialProgramasChecklist()
   )
-  // Por defecto mantener "escondidos" los programas educativos salvo la primera unidad de muestra (4800, id=6)
   const [expandedUnidades, setExpandedUnidades] = React.useState<Record<number, boolean>>(
     () => ({ 6: true })
   )
@@ -102,7 +105,7 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
     )
     toast.success(
       targetChecked
-        ? `Todas las carreras de ${unidadNombre} marcadas como resueltas.`
+        ? `Todas las carreras de ${unidadNombre} marcadas como resueltas (movida a columna de completadas).`
         : `Carreras de ${unidadNombre} devueltas a pendientes.`
     )
   }
@@ -189,6 +192,10 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
     isResolvedList: boolean
   ) => {
     const isExpanded = Boolean(expandedUnidades[group.unidad.id])
+    const programasParaMostrar =
+      soloPendientes && !isResolvedList
+        ? group.programas.filter((p) => !p.actasResueltas[tipoActa])
+        : group.programas
 
     return (
       <div
@@ -263,7 +270,7 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
               isResolvedList ? 'bg-muted/30' : 'bg-secondary/20'
             )}
           >
-            {group.programas.map((prog) => {
+            {programasParaMostrar.map((prog) => {
               const isChecked = prog.actasResueltas[tipoActa]
               const conteosList = Object.values(prog.tramitesPorTipo)
               const totalEnviadasProg = conteosList.reduce(
@@ -380,16 +387,34 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
         </Tabs>
       </div>
 
-      {/* Barra de búsqueda y avance rápido */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por clave UA, facultad, preparatoria o carrera..."
-            className="h-8 bg-background pl-8 text-xs"
-          />
+      {/* Barra de búsqueda, filtro rápido "Solo pendientes" y avance */}
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por clave UA, facultad, preparatoria o carrera..."
+              className="h-8 bg-background pl-8 text-xs"
+            />
+          </div>
+
+          {/* Filtro rápido: Ocultar completadas / Ver solo pendientes */}
+          <div className="flex items-center gap-2 self-start rounded-lg border border-border bg-secondary/40 px-3 py-1.5 sm:self-auto">
+            <Filter className="h-3.5 w-3.5 text-primary" />
+            <Label
+              htmlFor="switch-solo-pendientes"
+              className="cursor-pointer text-xs font-medium text-foreground select-none"
+            >
+              Ocultar completadas / Ver solo pendientes
+            </Label>
+            <Switch
+              id="switch-solo-pendientes"
+              checked={soloPendientes}
+              onCheckedChange={setSoloPendientes}
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 font-mono tabular-nums text-xs">
@@ -414,15 +439,20 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
         </div>
       </div>
 
-      {/* Dos listas: Pendientes vs. Resueltas (tono grisáceo) */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {/* Dos listas: Pendientes vs. Resueltas (o solo Pendientes cuando el filtro rápido está activo) */}
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-5',
+          !soloPendientes && 'lg:grid-cols-2'
+        )}
+      >
         {/* Lista 1: Actas Pendientes */}
         <Card className="border-border bg-card shadow-sm dark:shadow-none">
           <CardHeader className="border-b border-border/70 pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="flex items-center gap-2 text-base font-bold">
                 <Clock className="h-4 w-4 text-amber-500" />
-                <span>Actas Pendientes</span>
+                <span>Actas Pendientes (Faltantes)</span>
               </CardTitle>
               <Badge
                 variant="outline"
@@ -432,14 +462,16 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
               </Badge>
             </div>
             <CardDescription className="text-xs">
-              Haz clic en una unidad académica para desplegar sus programas educativos pendientes
+              {soloPendientes
+                ? 'Mostrando únicamente las escuelas y carreras que faltan por entregar actas'
+                : 'Al llegar al 100% de sus carreras, la escuela pasa automáticamente a la columna gris de resueltas'}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3 pt-4">
             {listaPendientes.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                Todas las unidades filtradas tienen sus actas resueltas.
+                Todas las unidades filtradas tienen sus actas resueltas al 100%.
               </div>
             ) : (
               listaPendientes.map((group) => renderUnidadItem(group, false))
@@ -448,35 +480,37 @@ export function ChecklistActasView({ nivel }: ChecklistActasViewProps) {
         </Card>
 
         {/* Lista 2: Actas Resueltas (Tono grisáceo indicando sin pendientes) */}
-        <Card className="border-border/60 bg-muted/25 shadow-none">
-          <CardHeader className="border-b border-border/50 pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base font-bold text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Actas Resueltas</span>
-              </CardTitle>
-              <Badge
-                variant="secondary"
-                className="font-mono tabular-nums text-[10px] text-muted-foreground"
-              >
-                {listaResueltas.length} completadas
-              </Badge>
-            </div>
-            <CardDescription className="text-xs text-muted-foreground/80">
-              Unidades académicas sin actas pendientes en esta categoría
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-3 pt-4">
-            {listaResueltas.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 py-10 text-center text-xs text-muted-foreground">
-                Aún no hay unidades académicas completadas en este filtro.
+        {!soloPendientes && (
+          <Card className="border-border/60 bg-muted/25 shadow-none">
+            <CardHeader className="border-b border-border/50 pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base font-bold text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Actas Resueltas (100%)</span>
+                </CardTitle>
+                <Badge
+                  variant="secondary"
+                  className="font-mono tabular-nums text-[10px] text-muted-foreground"
+                >
+                  {listaResueltas.length} completadas
+                </Badge>
               </div>
-            ) : (
-              listaResueltas.map((group) => renderUnidadItem(group, true))
-            )}
-          </CardContent>
-        </Card>
+              <CardDescription className="text-xs text-muted-foreground/80">
+                Unidades académicas sin actas pendientes en esta categoría
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-3 pt-4">
+              {listaResueltas.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 py-10 text-center text-xs text-muted-foreground">
+                  Aún no hay unidades académicas completadas en este filtro.
+                </div>
+              ) : (
+                listaResueltas.map((group) => renderUnidadItem(group, true))
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Modal para editar el número de trámites del programa seleccionado */}

@@ -8,6 +8,14 @@ export interface MonthlyMetricPoint {
   conError: number
 }
 
+export interface QuincenalMetricPoint {
+  mes: string
+  q1Enviadas: number
+  q1Resueltas: number
+  q2Enviadas: number
+  q2Resueltas: number
+}
+
 export interface TramiteDistributionItem {
   id: number
   nombre: string
@@ -31,7 +39,7 @@ export interface SeguimientoSummaryRow {
 }
 
 export interface ActaProgressSummary {
-  tipo: 'ORDINARIA' | 'EXTRAORDINARIA' | 'REGULARIZACION'
+  tipo: 'ORDINARIA' | 'EXTRAORDINARIA'
   etiqueta: string
   generadas: number
   pendientes: number
@@ -65,6 +73,30 @@ export const MONTHLY_METRICS_BY_NIVEL: Record<NivelFilter, MonthlyMetricPoint[]>
     { mes: 'Oct', enviadas: 205, resueltas: 170, pendientes: 28, conError: 7 },
     { mes: 'Nov', enviadas: 190, resueltas: 150, pendientes: 33, conError: 7 },
     { mes: 'Dic', enviadas: 105, resueltas: 82, pendientes: 20, conError: 3 },
+  ],
+}
+
+export const QUINCENAL_METRICS_BY_NIVEL: Record<NivelFilter, QuincenalMetricPoint[]> = {
+  TODOS: [
+    { mes: 'Ago', q1Enviadas: 98, q1Resueltas: 86, q2Enviadas: 112, q2Resueltas: 98 },
+    { mes: 'Sep', q1Enviadas: 140, q1Resueltas: 120, q2Enviadas: 155, q2Resueltas: 132 },
+    { mes: 'Oct', q1Enviadas: 182, q1Resueltas: 154, q2Enviadas: 198, q2Resueltas: 164 },
+    { mes: 'Nov', q1Enviadas: 176, q1Resueltas: 142, q2Enviadas: 169, q2Resueltas: 132 },
+    { mes: 'Dic', q1Enviadas: 110, q1Resueltas: 89, q2Enviadas: 80, q2Resueltas: 63 },
+  ],
+  BACHILLERATO: [
+    { mes: 'Ago', q1Enviadas: 44, q1Resueltas: 39, q2Enviadas: 51, q2Resueltas: 45 },
+    { mes: 'Sep', q1Enviadas: 62, q1Resueltas: 54, q2Enviadas: 68, q2Resueltas: 58 },
+    { mes: 'Oct', q1Enviadas: 84, q1Resueltas: 72, q2Enviadas: 91, q2Resueltas: 76 },
+    { mes: 'Nov', q1Enviadas: 79, q1Resueltas: 64, q2Enviadas: 76, q2Resueltas: 60 },
+    { mes: 'Dic', q1Enviadas: 49, q1Resueltas: 41, q2Enviadas: 36, q2Resueltas: 29 },
+  ],
+  LICENCIATURA: [
+    { mes: 'Ago', q1Enviadas: 54, q1Resueltas: 47, q2Enviadas: 61, q2Resueltas: 53 },
+    { mes: 'Sep', q1Enviadas: 78, q1Resueltas: 66, q2Enviadas: 87, q2Resueltas: 74 },
+    { mes: 'Oct', q1Enviadas: 98, q1Resueltas: 82, q2Enviadas: 107, q2Resueltas: 88 },
+    { mes: 'Nov', q1Enviadas: 97, q1Resueltas: 78, q2Enviadas: 93, q2Resueltas: 72 },
+    { mes: 'Dic', q1Enviadas: 61, q1Resueltas: 48, q2Enviadas: 44, q2Resueltas: 34 },
   ],
 }
 
@@ -202,14 +234,6 @@ export const CHECKLIST_ACTAS_SUMMARY: ActaProgressSummary[] = [
     generadas: 41,
     pendientes: 21,
     noAplica: 6,
-    totalProgramas: 68,
-  },
-  {
-    tipo: 'REGULARIZACION',
-    etiqueta: 'Actas de Regularización',
-    generadas: 29,
-    pendientes: 18,
-    noAplica: 21,
     totalProgramas: 68,
   },
 ]

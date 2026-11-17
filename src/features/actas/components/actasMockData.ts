@@ -4,7 +4,7 @@ import {
   UNIDADES_ACADEMICAS_CATALOGO,
 } from '@/features/tramites/components/tramitesMockData'
 
-export type TipoActaKey = 'ORDINARIA' | 'EXTRAORDINARIA' | 'REGULARIZACION'
+export type TipoActaKey = 'ORDINARIA' | 'EXTRAORDINARIA'
 
 export interface TramiteConteoPrograma {
   tipoTramiteId: number
@@ -27,7 +27,6 @@ export interface ProgramaChecklistItem {
 export const TIPOS_ACTA_TABS: { id: TipoActaKey; label: string }[] = [
   { id: 'ORDINARIA', label: 'Actas Ordinarias' },
   { id: 'EXTRAORDINARIA', label: 'Actas Extraordinarias' },
-  { id: 'REGULARIZACION', label: 'Regularización' },
 ]
 
 export function buildInitialProgramasChecklist(): ProgramaChecklistItem[] {
@@ -45,7 +44,6 @@ export function buildInitialProgramasChecklist(): ProgramaChecklistItem[] {
     const ordinariaResuelta = isUnitFullyResolvedOrd || isProg1OfInformatica
     const extraordinariaResuelta =
       prog.unidadAcademicaId === 2 || prog.unidadAcademicaId === 8
-    const regularizacionResuelta = prog.unidadAcademicaId === 2
 
     const defaultTramite = TIPOS_TRAMITE_CATALOGO[2] // Convalidación
     const initialCounts: Record<number, TramiteConteoPrograma> = {}
@@ -78,7 +76,6 @@ export function buildInitialProgramasChecklist(): ProgramaChecklistItem[] {
       actasResueltas: {
         ORDINARIA: ordinariaResuelta,
         EXTRAORDINARIA: extraordinariaResuelta,
-        REGULARIZACION: regularizacionResuelta,
       },
       tramitesPorTipo: initialCounts,
     }

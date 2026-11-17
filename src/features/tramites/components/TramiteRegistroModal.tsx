@@ -2,6 +2,7 @@ import * as React from 'react'
 import {
   AlertCircle,
   CheckCircle2,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
   Layers,
@@ -10,6 +11,7 @@ import {
   RotateCcw,
   Save,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -60,6 +62,7 @@ interface TramiteLineDraft {
   pendientes: string
   conError: string
   archivoPdfNombre: string
+  archivoPdfUrl: string
   observaciones: string
 }
 
@@ -72,6 +75,7 @@ function createEmptyLine(tipoTramiteId = ''): TramiteLineDraft {
     pendientes: '',
     conError: '',
     archivoPdfNombre: '',
+    archivoPdfUrl: '',
     observaciones: '',
   }
 }
@@ -635,23 +639,64 @@ export function TramiteRegistroModal({
                           )}
 
                           {selectedTramite?.permitePdf && (
-                            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-background px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
-                              <FileText className="h-3.5 w-3.5 text-primary" />
-                              <span>
-                                {linea.archivoPdfNombre || 'Adjuntar PDF opcional'}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+                                <FileText className="h-3.5 w-3.5 text-primary" />
+                                <span className="max-w-44 truncate">
+                                  {linea.archivoPdfNombre || 'Respaldo PDF opcional'}
+                                </span>
                               </span>
-                              <input
-                                type="file"
-                                accept="application/pdf"
-                                className="sr-only"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0]
-                                  updateLine(linea.uid, {
-                                    archivoPdfNombre: file ? file.name : '',
-                                  })
+
+                              <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-[11px] font-medium text-foreground shadow-sm transition-colors hover:bg-secondary">
+                                <Upload className="h-3 w-3 text-primary" />
+                                <span>
+                                  {linea.archivoPdfNombre ? 'Cambiar PDF' : 'Adjuntar PDF'}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept="application/pdf"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file) return
+                                    if (linea.archivoPdfUrl) {
+                                      URL.revokeObjectURL(linea.archivoPdfUrl)
+                                    }
+                                    const nextUrl = URL.createObjectURL(file)
+                                    updateLine(linea.uid, {
+                                      archivoPdfNombre: file.name,
+                                      archivoPdfUrl: nextUrl,
+                                    })
+                                    toast.success(
+                                      `PDF "${file.name}" adjuntado en vista previa.`
+                                    )
+                                  }}
+                                />
+                              </label>
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (linea.archivoPdfUrl) {
+                                    window.open(
+                                      linea.archivoPdfUrl,
+                                      '_blank',
+                                      'noopener,noreferrer'
+                                    )
+                                    return
+                                  }
+                                  toast.info(
+                                    'Adjunta primero un archivo .pdf para abrirlo en una pestaña nueva.'
+                                  )
                                 }}
-                              />
-                            </label>
+                                className="h-7 gap-1 px-2.5 text-[11px]"
+                              >
+                                <ExternalLink className="h-3 w-3 text-primary" />
+                                <span>Abrir / Ver PDF</span>
+                              </Button>
+                            </div>
                           )}
                         </div>
                       )}

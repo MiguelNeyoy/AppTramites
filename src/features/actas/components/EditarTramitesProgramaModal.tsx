@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { AlertCircle, CheckCircle2, FileEdit, Save } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  FileEdit,
+  FileText,
+  Save,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -49,7 +58,7 @@ export function EditarTramitesProgramaModal({
   programa,
   onSaveConteo,
 }: EditarTramitesProgramaModalProps) {
-  const defaultTramiteId = String(TIPOS_TRAMITE_CATALOGO[2].id) // Convalidación por defecto
+  const defaultTramiteId = String(TIPOS_TRAMITE_CATALOGO[2].id)
   const initialTramiteId = React.useMemo(() => {
     if (!programa) return defaultTramiteId
     const existingKeys = Object.keys(programa.tramitesPorTipo)
@@ -71,6 +80,12 @@ export function EditarTramitesProgramaModal({
   const [conError, setConError] = React.useState<string>(
     String(initialConteo?.conError ?? 0)
   )
+  const [pdfNombre, setPdfNombre] = React.useState<string>('')
+  const [pdfPreviewUrl, setPdfPreviewUrl] = React.useState<string>('')
+
+  const selectedTramite = TIPOS_TRAMITE_CATALOGO.find(
+    (t) => String(t.id) === tipoTramiteId
+  )
 
   const handleSelectTramite = (nextTramiteId: string) => {
     setTipoTramiteId(nextTramiteId)
@@ -79,6 +94,36 @@ export function EditarTramitesProgramaModal({
     setResueltas(String(existing?.resueltas ?? 0))
     setPendientes(String(existing?.pendientes ?? 0))
     setConError(String(existing?.conError ?? 0))
+  }
+
+  const handleAttachPdf = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl)
+    }
+    const nextUrl = URL.createObjectURL(file)
+    setPdfNombre(file.name)
+    setPdfPreviewUrl(nextUrl)
+    toast.success(`PDF "${file.name}" adjuntado en vista previa.`)
+  }
+
+  const handleOpenPdf = () => {
+    if (pdfPreviewUrl) {
+      window.open(pdfPreviewUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+    toast.info(
+      'Adjunta primero un archivo .pdf para abrirlo en una pestaña nueva.'
+    )
+  }
+
+  const handleRemovePdf = () => {
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl)
+    }
+    setPdfNombre('')
+    setPdfPreviewUrl('')
   }
 
   const envNum = parseNonNegative(enviadas)
@@ -140,7 +185,7 @@ export function EditarTramitesProgramaModal({
           </DialogHeader>
 
           <div className="space-y-4 px-5 py-4">
-            {/* Contexto fijo: Escuela y Carrera (como en la imagen de referencia) */}
+            {/* Contexto fijo: Escuela y Carrera */}
             <div className="space-y-1.5 rounded-lg border border-border bg-secondary/35 p-3 text-xs">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -169,12 +214,22 @@ export function EditarTramitesProgramaModal({
 
             {/* Selector de Trámite */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="edit-select-tramite"
-                className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
-              >
-                Trámite
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="edit-select-tramite"
+                  className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+                >
+                  Trámite
+                </Label>
+                {selectedTramite?.permitePdf && (
+                  <Badge
+                    variant="outline"
+                    className="border-primary/30 bg-primary/10 text-[10px] text-primary"
+                  >
+                    Permite PDF de respaldo
+                  </Badge>
+                )}
+              </div>
               <Select value={tipoTramiteId} onValueChange={handleSelectTramite}>
                 <SelectTrigger
                   id="edit-select-tramite"
@@ -266,6 +321,56 @@ export function EditarTramitesProgramaModal({
                 />
               </div>
             </div>
+
+            {/* Bloque opcional para Adjuntar y Abrir PDF en Complementarias y Anular Folio */}
+            {selectedTramite?.permitePdf && (
+              <div className="space-y-2 rounded-lg border border-dashed border-border bg-secondary/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FileText className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="truncate text-xs font-semibold text-foreground">
+                      {pdfNombre || 'Respaldo PDF opcional (Oficio / Solicitud)'}
+                    </span>
+                  </div>
+                  {pdfNombre && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRemovePdf}
+                      aria-label="Quitar PDF"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-secondary">
+                    <Upload className="h-3.5 w-3.5 text-primary" />
+                    <span>{pdfNombre ? 'Cambiar PDF' : 'Adjuntar PDF'}</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="sr-only"
+                      onChange={handleAttachPdf}
+                    />
+                  </label>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenPdf}
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                    <span>Abrir / Ver PDF</span>
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Estado del balance numérico */}
             <div className="flex items-center justify-between rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 text-[11px]">

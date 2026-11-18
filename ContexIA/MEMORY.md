@@ -1,7 +1,7 @@
 ---
 tipo: memoria_ai
 proyecto: "SistemaSeguimientoDeTramites"
-actualizado: 2026-11-11
+actualizado: 2026-11-17
 tags:
   - context-ai
   - memory
@@ -19,15 +19,19 @@ tags:
 
 **Avances completados:**
 * **Base de datos y tipos:** Esquema, seeds y políticas RLS desplegados en Supabase Self-Hosted (`192.168.1.75`, Studio en `:54323`); `.env` configurado y tipos generados en `src/types/database.types.ts`.
-* **Esqueleto del proyecto:** Capa de datos centralizada por recurso/tabla (`src/services/`), features ligeras para UI y hooks (`src/features/{auth,actas,tramites,fichas,dashboard,catalogos}/{components,hooks}`), cliente tipado (`src/lib/supabase.ts`), `useTheme` claro/oscuro (`src/app/useTheme.ts`), alias `@/` y base PWA (`vite-plugin-pwa` en `vite.config.ts`).
+* **Esqueleto del proyecto:** Capa de datos centralizada y organizada por dominio en `src/services/{login,tramites,actas,fichas,catalogos,shared}/` (cada carpeta agrupa su servicio, validaciones y barrel `index.ts`; `shared/` centraliza utilidades comunes como `supabaseErrors.ts`), features ligeras para UI y hooks (`src/features/{auth,actas,tramites,fichas,dashboard,catalogos}/{components,hooks}`), cliente tipado (`src/lib/supabase.ts`), `useTheme` claro/oscuro (`src/app/useTheme.ts`), alias `@/` y base PWA (`vite-plugin-pwa` en `vite.config.ts`).
 * **Sistema de diseño e UI base:** Tokens HSL en `src/index.css` y `tailwind.config.js`, Shadcn UI (`components.json`, `src/lib/utils.ts`) con 13 componentes instalados en `src/components/ui/` (Radix, Lucide, Sonner, next-themes). `tsc -b`, `lint` y `build` pasando en limpio.
 * **UI del Login (Issue #2):** Vista split-screen minimalista con escudo oficial UAS (`src/assets/uas-escudo.png`) implementada en `src/features/auth/components/LoginPage.tsx` usando `Card`, `Input`, `Label`, `Checkbox` y `Button` de `shadcn/ui`, sin lógica de autenticación aún (incluye botón temporal para saltar al tablero).
 * **UI del Dashboard Principal (Issue #3):** Shell responsivo (sidebar + topbar PWA), 4 KPIs globales, gráficas mensuales/por nivel y distribución por trámite con tokens `--chart-1..5`, tabla densa de cortes por unidad académica y resumen de checklist de actas en `src/features/dashboard/` (conectado vía bypass temporal en `src/app/App.tsx`).
 * **UI del Formulario de Registro de Trámites (Issue #4):** Modal `Dialog` sin actas en `src/features/tramites/components/TramiteRegistroModal.tsx` (cascada Unidad Académica -> Programa Educativo, selección de trámite, conteos `enviadas`/`resueltas`/`pendientes`/`conError`, soporte individual y por lote con precarga de 8 trámites y PDF opcional).
 * **UI del Checklist de Actas (Issue #5):** Vista en `src/features/actas/components/ChecklistActasView.tsx` con dos listas (Unidades Pendientes y Unidades Resueltas en tono grisáceo), programas educativos en toggle list desplegable, acción `Todo`/`Reabrir` por unidad y modal `EditarTramitesProgramaModal.tsx` para editar el número de trámites por carrera.
+* **UI de Catálogos (Issue #9):** Vista maestro-detalle y pestañas en `src/features/catalogos/components/CatalogosView.tsx` para visualizar, crear, editar, activar/inactivar y eliminar (vía modal de confirmación) Unidades Académicas, Preparatorias, Programas Educativos y Tipos de Trámite.
+* **UI de Usuarios (Issue #10):** Vista exclusiva `ADMIN` en `src/features/usuarios/components/UsuariosView.tsx` y modal `UsuarioFormModal.tsx` con contratos tipados `1:1` sobre `public.perfiles` y callbacks listos para conectar BD (`nombre`, `email`, `rol`/división, `activo`).
+* **Servicio de Login y Validación (Issue #6):** Estructurado por carpetas en `src/services/login/` (`login.service.ts`, `loginValidation.ts`, `index.ts`) y `src/services/shared/` (`supabaseErrors.ts`, `index.ts`), junto al hook `src/features/auth/hooks/useAuth.ts`, con autenticación Supabase (`signInWithPassword`), verificación de perfil activo en `public.perfiles`, recuperación de contraseña (`resetPasswordForEmail` / `updateUser`), validación estricta de correo/contraseña y bloqueo de patrones SQL injection en frontend, integrado en `LoginPage.tsx`, `App.tsx`, `DashboardPage.tsx` y `DashboardSidebar.tsx`.
+* **Servicio y Módulo de Catálogos (Issue #8):** Implementado `src/services/catalogos/` (`catalogos.service.ts`, `catalogosValidation.ts`, `index.ts`) con lectura global (`fetchAllCatalogos`) y CRUD completo (agregar, editar, activar/desactivar, eliminar) para `unidades_academicas`, `programas_educativos`, `tipos_tramite` y `periodos_escolares`. Integrado en `src/features/catalogos/hooks/useCatalogos.ts`, `CatalogosView.tsx` (incluyendo pestaña de Periodos Escolares) y `CatalogosModals.tsx` (`PeriodoFormModal`).
 
 **Dónde nos quedamos (Pendiente inmediato):**
-1. **Siguiente módulo (Issue #1):** Implementar lógica de `src/features/auth` (contexto/hook `useAuth`, carga de rol desde `perfiles`, protección de rutas y conexión real de `LoginPage`).
+1. **Completar Issue #1 (Protección de rutas por rol):** Los servicios base de autenticación y `useAuth` ya están conectados para Issue #6; falta restringir vistas/módulos según `rol_usuario` (`ADMIN`, `LICENCIATURA`, `BACHILLERATO`, `NUEVO_INGRESO`) y retirar el botón temporal de bypass en producción.
 2. **Módulos funcionales:** Tablero de 8 trámites generales, módulo transversal de Fichas de Nuevo Ingreso, checklist semestral de Actas, métricas/catálogos y exportación `.xlsx` con ExcelJS.
 3. **Pendientes menores de setup:** Agregar iconos PWA (`pwa-192x192.png`, `pwa-512x512.png` referenciados en `vite.config.ts`) y cambiar `require("tailwindcss-animate")` a `import` ESM en `tailwind.config.js` (línea 104) si genera aviso en editor/Node.
 

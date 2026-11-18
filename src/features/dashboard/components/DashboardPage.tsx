@@ -40,8 +40,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import type { PerfilUsuario } from '@/services/login'
 import { ChecklistActasView } from '@/features/actas'
+import { CatalogosView } from '@/features/catalogos'
 import { TramiteRegistroModal } from '@/features/tramites'
+import { UsuariosView } from '@/features/usuarios'
 import { DashboardCharts } from './DashboardCharts'
 import { DashboardSidebar, type DashboardNavId } from './DashboardSidebar'
 import {
@@ -57,12 +60,14 @@ interface DashboardPageProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   onLogout: () => void
+  perfil?: PerfilUsuario | null
 }
 
 export function DashboardPage({
   theme,
   onToggleTheme,
   onLogout,
+  perfil,
 }: DashboardPageProps) {
   const [activeNav, setActiveNav] = React.useState<DashboardNavId>('dashboard')
   const [nivel, setNivel] = React.useState<NivelFilter>('TODOS')
@@ -110,10 +115,6 @@ export function DashboardPage({
     setActiveNav(id)
     if (id === 'tramites') {
       setRegistroModalOpen(true)
-      return
-    }
-    if (id !== 'dashboard' && id !== 'actas') {
-      toast.info('Vista en diseño para próximos issues; mostrando resumen global.')
     }
   }
 
@@ -139,6 +140,7 @@ export function DashboardPage({
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
         onLogout={onLogout}
+        perfil={perfil}
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -157,7 +159,13 @@ export function DashboardPage({
             </Button>
 
             <h1 className="truncate text-base font-bold tracking-tight sm:text-lg">
-              {activeNav === 'actas' ? 'Checklist de Actas' : 'Dashboard'}
+              {activeNav === 'actas'
+                ? 'Checklist de Actas'
+                : activeNav === 'catalogos'
+                  ? 'Catálogos URS'
+                  : activeNav === 'usuarios'
+                    ? 'Usuarios'
+                    : 'Dashboard'}
             </h1>
           </div>
 
@@ -198,16 +206,18 @@ export function DashboardPage({
             </Button>
 
             {/* Único CTA primario dorado por vista principal */}
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleRegisterCutPreview}
-              className="h-8 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs shadow-sm transition-all duration-150"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Registrar Corte</span>
-              <span className="sm:hidden">Corte</span>
-            </Button>
+            {activeNav !== 'catalogos' && activeNav !== 'usuarios' && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleRegisterCutPreview}
+                className="h-8 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs shadow-sm transition-all duration-150"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Registrar Corte</span>
+                <span className="sm:hidden">Corte</span>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -215,6 +225,13 @@ export function DashboardPage({
         <main className="flex-1 overflow-y-auto space-y-5 p-4 sm:p-6">
           {activeNav === 'actas' ? (
             <ChecklistActasView nivel={nivel} />
+          ) : activeNav === 'catalogos' ? (
+            <CatalogosView nivel={nivel} />
+          ) : activeNav === 'usuarios' ? (
+            <UsuariosView
+              isAdmin={!perfil || perfil.rol === 'ADMIN'}
+              currentUserId={perfil?.id}
+            />
           ) : (
             <>
               {/* Fila 1: 4 Tarjetas KPI */}

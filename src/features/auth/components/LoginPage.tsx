@@ -1,5 +1,17 @@
 import * as React from 'react'
-import { ArrowRight, Eye, EyeOff, Lock, Mail, Moon, Sun } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  Moon,
+  Sun,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
 import uasEscudo from '@/assets/uas-escudo.png'
 import { Button } from '@/components/ui/button'
@@ -12,14 +24,39 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import {
+  loginWithEmail,
+  normalizeEmail,
+  requestPasswordReset,
+  updatePassword,
+  validateLoginInput,
+  validateNewPassword,
+  validatePasswordResetInput,
+  type AuthSessionResult,
+} from '@/services/login'
+import { mapSupabaseError } from '@/services/shared'
 
 interface LoginPageProps {
   theme?: 'light' | 'dark'
   onToggleTheme?: () => void
   onBypassLogin?: () => void
+  onLoginSuccess?: (session: AuthSessionResult) => void
+  isPasswordRecovery?: boolean
+  onClearPasswordRecovery?: () => void
 }
+
+const REMEMBERED_EMAIL_KEY = 'tramitesuas_remembered_email'
 
 const FEATURES = [
   '9 Trámites Oficiales y Nuevo Ingreso',
@@ -31,15 +68,147 @@ export function LoginPage({
   theme = 'light',
   onToggleTheme,
   onBypassLogin,
+  onLoginSuccess,
+  isPasswordRecovery = false,
+  onClearPasswordRecovery,
 }: LoginPageProps) {
-  const [email, setEmail] = React.useState('')
+  const [email, setEmail] = React.useState(() => {
+    if (typeof window === 'undefined') {
+      return ''
+    }
+    return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? ''
+  })
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
-  const [rememberSession, setRememberSession] = React.useState(false)
+  const [rememberSession, setRememberSession] = React.useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+    return Boolean(window.localStorage.getItem(REMEMBERED_EMAIL_KEY))
+  })
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [emailError, setEmailError] = React.useState<string | null>(null)
+  const [passwordError, setPasswordError] = React.useState<string | null>(null)
+  const [formError, setFormError] = React.useState<string | null>(null)
+
+  // Modal de recuperacion de contrasena
+  const [resetModalOpen, setResetModalOpen] = React.useState(false)
+  const [resetEmail, setResetEmail] = React.useState('')
+  const [resetEmailError, setResetEmailError] = React.useState<string | null>(null)
+  const [isSendingReset, setIsSendingReset] = React.useState(false)
+  const [resetSentTo, setResetSentTo] = React.useState<string | null>(null)
+
+  // Modal para definir nueva contrasena cuando regresa desde enlace de recuperacion
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmPassword, setConfirmPassword] = React.useState('')
+  const [recoveryPasswordError, setRecoveryPasswordError] = React.useState<
+    string | null
+  >(null)
+  const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false)
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // Interfaz visual únicamente (Issue #2); la lógica de autenticación se integra en Issue #1.
+    setFormError(null)
+
+    const validation = validateLoginInput(email, password)
+    setEmailError(validation.errors.email ?? null)
+    setPasswordError(validation.errors.password ?? null)
+
+    if (!validation.valid) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const sessionResult = await loginWithEmail({
+        email: validation.email,
+        password,
+      })
+
+      if (typeof window !== 'undefined') {
+        if (rememberSession) {
+          window.localStorage.setItem(REMEMBERED_EMAIL_KEY, validation.email)
+        } else {
+          window.localStorage.removeItem(REMEMBERED_EMAIL_KEY)
+        }
+      }
+
+      setPassword('')
+      toast.success(`Bienvenido, ${sessionResult.perfil.nombre}`)
+      onLoginSuccess?.(sessionResult)
+    } catch (error) {
+      const mapped = mapSupabaseError(error)
+      if (mapped.field === 'email') {
+        setEmailError(mapped.message)
+      } else if (mapped.field === 'password') {
+        setPasswordError(mapped.message)
+      } else {
+        setFormError(mapped.message)
+      }
+      toast.error(mapped.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleOpenResetModal = () => {
+    setResetEmail(normalizeEmail(email))
+    setResetEmailError(null)
+    setResetSentTo(null)
+    setResetModalOpen(true)
+  }
+
+  const handleResetSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const validation = validatePasswordResetInput(resetEmail)
+    if (!validation.valid) {
+      setResetEmailError(validation.error ?? 'Ingresa un correo electrónico válido.')
+      return
+    }
+
+    setResetEmailError(null)
+    setIsSendingReset(true)
+    try {
+      const result = await requestPasswordReset(validation.email)
+      setResetSentTo(result.email)
+      toast.success(
+        'Si el correo está dado de alta, recibirás instrucciones para restablecer tu contraseña.'
+      )
+    } catch (error) {
+      const mapped = mapSupabaseError(error)
+      setResetEmailError(mapped.message)
+      toast.error(mapped.message)
+    } finally {
+      setIsSendingReset(false)
+    }
+  }
+
+  const handleUpdatePasswordSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault()
+    const validation = validateNewPassword(newPassword, confirmPassword)
+    if (!validation.valid) {
+      setRecoveryPasswordError(validation.error ?? 'Contraseña inválida.')
+      return
+    }
+
+    setRecoveryPasswordError(null)
+    setIsUpdatingPassword(true)
+    try {
+      await updatePassword(newPassword, confirmPassword)
+      setNewPassword('')
+      setConfirmPassword('')
+      toast.success('Contraseña actualizada correctamente. Ya puedes iniciar sesión.')
+      onClearPasswordRecovery?.()
+    } catch (error) {
+      const mapped = mapSupabaseError(error)
+      setRecoveryPasswordError(mapped.message)
+      toast.error(mapped.message)
+    } finally {
+      setIsUpdatingPassword(false)
+    }
   }
 
   return (
@@ -196,7 +365,17 @@ export function LoginPage({
           </CardHeader>
 
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label
                   htmlFor="login-email"
@@ -212,10 +391,29 @@ export function LoginPage({
                     autoComplete="email"
                     placeholder="usuario@uas.edu.mx"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="h-10 pl-9 bg-background/60 border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:border-primary/60 transition-all duration-150"
+                    disabled={isSubmitting}
+                    aria-invalid={Boolean(emailError)}
+                    onChange={(event) => {
+                      setEmail(event.target.value)
+                      if (emailError) {
+                        setEmailError(null)
+                      }
+                      if (formError) {
+                        setFormError(null)
+                      }
+                    }}
+                    className={cn(
+                      'h-10 pl-9 bg-background/60 border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:border-primary/60 transition-all duration-150',
+                      emailError &&
+                        'border-destructive/60 focus-visible:border-destructive focus-visible:ring-destructive/20'
+                    )}
                   />
                 </div>
+                {emailError && (
+                  <p className="text-[11px] text-destructive" role="alert">
+                    {emailError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -233,13 +431,28 @@ export function LoginPage({
                     autoComplete="current-password"
                     placeholder="••••••••"
                     value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="h-10 pl-9 pr-10 bg-background/60 border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:border-primary/60 transition-all duration-150"
+                    disabled={isSubmitting}
+                    aria-invalid={Boolean(passwordError)}
+                    onChange={(event) => {
+                      setPassword(event.target.value)
+                      if (passwordError) {
+                        setPasswordError(null)
+                      }
+                      if (formError) {
+                        setFormError(null)
+                      }
+                    }}
+                    className={cn(
+                      'h-10 pl-9 pr-10 bg-background/60 border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:border-primary/60 transition-all duration-150',
+                      passwordError &&
+                        'border-destructive/60 focus-visible:border-destructive focus-visible:ring-destructive/20'
+                    )}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
+                    disabled={isSubmitting}
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-transparent"
@@ -251,6 +464,11 @@ export function LoginPage({
                     )}
                   </Button>
                 </div>
+                {passwordError && (
+                  <p className="text-[11px] text-destructive" role="alert">
+                    {passwordError}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-0.5">
@@ -258,6 +476,7 @@ export function LoginPage({
                   <Checkbox
                     id="remember-session"
                     checked={rememberSession}
+                    disabled={isSubmitting}
                     onCheckedChange={(checked) => setRememberSession(Boolean(checked))}
                   />
                   <Label
@@ -272,6 +491,8 @@ export function LoginPage({
                   type="button"
                   variant="link"
                   size="sm"
+                  disabled={isSubmitting}
+                  onClick={handleOpenResetModal}
                   className="h-auto p-0 text-xs font-medium text-primary hover:text-primary/80"
                 >
                   ¿Olvidaste tu contraseña?
@@ -280,9 +501,17 @@ export function LoginPage({
 
               <Button
                 type="submit"
-                className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-sm transition-all duration-150"
+                disabled={isSubmitting}
+                className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-sm shadow-sm transition-all duration-150 gap-2"
               >
-                Ingresar
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Verificando...</span>
+                  </>
+                ) : (
+                  <span>Ingresar</span>
+                )}
               </Button>
             </form>
           </CardContent>
@@ -294,6 +523,7 @@ export function LoginPage({
                 variant="outline"
                 size="sm"
                 onClick={onBypassLogin}
+                disabled={isSubmitting}
                 className="w-full gap-2 text-xs text-muted-foreground hover:text-foreground border-dashed border-border transition-all duration-150"
               >
                 <span>Entrar sin login (temporal)</span>
@@ -306,6 +536,205 @@ export function LoginPage({
           </CardFooter>
         </Card>
       </main>
+
+      {/* Modal de recuperacion de contraseña */}
+      <Dialog open={resetModalOpen} onOpenChange={setResetModalOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-foreground">
+              Recuperar contraseña
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Ingresa tu correo institucional dado de alta para enviarte un enlace de restablecimiento.
+            </DialogDescription>
+          </DialogHeader>
+
+          {resetSentTo ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-start gap-2.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-foreground">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold">Solicitud enviada</p>
+                  <p className="text-muted-foreground">
+                    Si <span className="font-mono text-foreground">{resetSentTo}</span> está registrado y activo, recibirás un correo con los pasos para definir una nueva contraseña.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={() => setResetModalOpen(false)}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs"
+                >
+                  Entendido
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <form onSubmit={handleResetSubmit} noValidate className="space-y-4">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="reset-email"
+                  className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+                >
+                  Correo electrónico institucional
+                </Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="usuario@uas.edu.mx"
+                    value={resetEmail}
+                    disabled={isSendingReset}
+                    aria-invalid={Boolean(resetEmailError)}
+                    onChange={(event) => {
+                      setResetEmail(event.target.value)
+                      if (resetEmailError) {
+                        setResetEmailError(null)
+                      }
+                    }}
+                    className={cn(
+                      'h-10 pl-9 bg-background/60 border-border text-sm',
+                      resetEmailError && 'border-destructive/60'
+                    )}
+                  />
+                </div>
+                {resetEmailError && (
+                  <p className="text-[11px] text-destructive" role="alert">
+                    {resetEmailError}
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setResetModalOpen(false)}
+                  disabled={isSendingReset}
+                  className="text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSendingReset}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs gap-2"
+                >
+                  {isSendingReset ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <span>Enviar enlace</span>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de definicion de nueva contraseña tras enlace de recuperacion */}
+      <Dialog
+        open={isPasswordRecovery}
+        onOpenChange={(open) => {
+          if (!open) {
+            onClearPasswordRecovery?.()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-foreground">
+              Definir nueva contraseña
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Ingresa tu nueva contraseña institucional (mínimo 8 caracteres).
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdatePasswordSubmit} noValidate className="space-y-4">
+            {recoveryPasswordError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{recoveryPasswordError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="recovery-new-password"
+                className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+              >
+                Nueva contraseña
+              </Label>
+              <Input
+                id="recovery-new-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                value={newPassword}
+                disabled={isUpdatingPassword}
+                onChange={(event) => {
+                  setNewPassword(event.target.value)
+                  if (recoveryPasswordError) {
+                    setRecoveryPasswordError(null)
+                  }
+                }}
+                className="h-10 bg-background/60 border-border text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="recovery-confirm-password"
+                className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+              >
+                Confirmar contraseña
+              </Label>
+              <Input
+                id="recovery-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                disabled={isUpdatingPassword}
+                onChange={(event) => {
+                  setConfirmPassword(event.target.value)
+                  if (recoveryPasswordError) {
+                    setRecoveryPasswordError(null)
+                  }
+                }}
+                className="h-10 bg-background/60 border-border text-sm"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="submit"
+                disabled={isUpdatingPassword}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs gap-2"
+              >
+                {isUpdatingPassword ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Actualizando...</span>
+                  </>
+                ) : (
+                  <span>Guardar contraseña</span>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

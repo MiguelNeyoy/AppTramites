@@ -4,6 +4,7 @@ import {
   FileSpreadsheet,
   FolderKanban,
   LogOut,
+  Users,
   X,
 } from 'lucide-react'
 
@@ -11,6 +12,7 @@ import uasEscudo from '@/assets/uas-escudo.png'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import type { PerfilUsuario } from '@/services/login'
 import type { NivelFilter } from './dashboardMockData'
 
 export type DashboardNavId =
@@ -18,6 +20,7 @@ export type DashboardNavId =
   | 'tramites'
   | 'actas'
   | 'catalogos'
+  | 'usuarios'
 
 interface DashboardSidebarProps {
   activeNav: DashboardNavId
@@ -27,6 +30,7 @@ interface DashboardSidebarProps {
   mobileOpen: boolean
   onCloseMobile: () => void
   onLogout: () => void
+  perfil?: PerfilUsuario | null
 }
 
 interface NavGroup {
@@ -35,6 +39,7 @@ interface NavGroup {
     id: DashboardNavId
     label: string
     icon: typeof BarChart3
+    adminOnly?: boolean
   }[]
 }
 
@@ -51,9 +56,28 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'actas', label: 'Checklist de Actas', icon: ClipboardCheck },
       { id: 'catalogos', label: 'Catálogos URS', icon: FolderKanban },
+      { id: 'usuarios', label: 'Usuarios', icon: Users, adminOnly: true },
     ],
   },
 ]
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Administrador URS',
+  LICENCIATURA: 'Control Escolar Licenciatura',
+  BACHILLERATO: 'Control Escolar Bachillerato',
+  NUEVO_INGRESO: 'Fichas Nuevo Ingreso',
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) {
+    return 'US'
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+}
 
 export function DashboardSidebar({
   activeNav,
@@ -63,7 +87,11 @@ export function DashboardSidebar({
   mobileOpen,
   onCloseMobile,
   onLogout,
+  perfil,
 }: DashboardSidebarProps) {
+  const displayName = perfil?.nombre ?? 'Admin Escolar'
+  const displayRole = perfil ? ROLE_LABEL[perfil.rol] ?? perfil.rol : 'Vista Global URS'
+  const initials = perfil ? getInitials(perfil.nombre) : 'AD'
   const sidebarContent = (
     <div className="flex h-full w-60 flex-col bg-card border-r border-border text-foreground">
       {/* Cabecera de Marca */}
@@ -122,51 +150,59 @@ export function DashboardSidebar({
       </div>
 
       {/* Navegación por secciones */}
-      <nav aria-label="Navegación principal" className="flex-1 px-3 py-2.5 space-y-4">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.section}>
-            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {group.section}
-            </p>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon
-                const isActive = activeNav === item.id
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectNav(item.id)
-                      onCloseMobile()
-                    }}
-                    className={cn(
-                      'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
-                        : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground border border-transparent'
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </button>
-                )
-              })}
+      <nav aria-label="Navegación principal" className="flex-1 px-3 py-2 space-y-3.5">
+        {NAV_GROUPS.map((group) => {
+          const isAdminUser = !perfil || perfil.rol === 'ADMIN'
+          const visibleItems = group.items.filter(
+            (item) => !item.adminOnly || isAdminUser
+          )
+          if (visibleItems.length === 0) return null
+
+          return (
+            <div key={group.section}>
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {group.section}
+              </p>
+              <div className="space-y-1">
+                {visibleItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = activeNav === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectNav(item.id)
+                        onCloseMobile()
+                      }}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
+                          : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground border border-transparent'
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Tarjeta de Usuario y Salida */}
       <div className="border-t border-border p-3 space-y-2">
         <div className="flex items-center gap-2.5 rounded-lg bg-secondary/40 px-2.5 py-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            AD
+            {initials}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-xs font-semibold">Admin Escolar</p>
+            <p className="truncate text-xs font-semibold">{displayName}</p>
             <p className="truncate text-[10px] text-muted-foreground">
-              Vista Global URS
+              {displayRole}
             </p>
           </div>
         </div>
@@ -179,7 +215,7 @@ export function DashboardSidebar({
           className="w-full justify-start gap-2 h-8 px-2.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
         >
           <LogOut className="h-3.5 w-3.5" />
-          <span>Volver al login</span>
+          <span>{perfil ? 'Cerrar sesión' : 'Volver al login'}</span>
         </Button>
       </div>
     </div>

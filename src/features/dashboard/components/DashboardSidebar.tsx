@@ -1,9 +1,9 @@
 import {
-  BarChart3,
   ClipboardCheck,
   FileSpreadsheet,
   FolderKanban,
   LogOut,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -13,11 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { PerfilUsuario } from '@/services/login'
-import type { NivelFilter } from './dashboardMockData'
+import type { NivelFilter } from '../types'
 
 export type DashboardNavId =
-  | 'dashboard'
-  | 'tramites'
+  | 'alumnos'
+  | 'fichas'
   | 'actas'
   | 'catalogos'
   | 'usuarios'
@@ -38,7 +38,7 @@ interface NavGroup {
   items: {
     id: DashboardNavId
     label: string
-    icon: typeof BarChart3
+    icon: typeof FileSpreadsheet
     adminOnly?: boolean
   }[]
 }
@@ -47,8 +47,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: 'Principal',
     items: [
-      { id: 'dashboard', label: 'Resumen Global', icon: BarChart3 },
-      { id: 'tramites', label: 'Trámites Generales', icon: FileSpreadsheet },
+      { id: 'alumnos', label: 'General', icon: FileSpreadsheet },
+      { id: 'fichas', label: 'Nuevo Ingreso', icon: UserPlus },
     ],
   },
   {
@@ -66,6 +66,7 @@ const ROLE_LABEL: Record<string, string> = {
   LICENCIATURA: 'Control Escolar Licenciatura',
   BACHILLERATO: 'Control Escolar Bachillerato',
   NUEVO_INGRESO: 'Fichas Nuevo Ingreso',
+  UNIDAD_ACADEMICA: 'Control por Unidad Académica',
 }
 
 function getInitials(name: string): string {
@@ -92,9 +93,9 @@ export function DashboardSidebar({
   const displayName = perfil?.nombre ?? 'Admin Escolar'
   const displayRole = perfil ? ROLE_LABEL[perfil.rol] ?? perfil.rol : 'Vista Global URS'
   const initials = perfil ? getInitials(perfil.nombre) : 'AD'
+
   const sidebarContent = (
-    <div className="flex h-full w-60 flex-col bg-card border-r border-border text-foreground">
-      {/* Cabecera de Marca */}
+    <div className="flex h-full w-60 flex-col border-r border-border bg-card text-foreground">
       <div className="flex h-14 items-center justify-between border-b border-border px-4">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-uas-blue p-1">
@@ -120,37 +121,45 @@ export function DashboardSidebar({
           size="icon"
           onClick={onCloseMobile}
           aria-label="Cerrar menú"
-          className="h-7 w-7 lg:hidden text-muted-foreground"
+          className="h-7 w-7 text-muted-foreground lg:hidden"
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Selector de División / Nivel (Visible en vista global/admin) */}
-      <div className="px-3 pt-4 pb-2">
+      <div className="px-3 pb-2 pt-4">
         <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           División Académica
         </p>
-        <Tabs
-          value={nivel}
-          onValueChange={(value) => onNivelChange(value as NivelFilter)}
-        >
-          <TabsList className="grid w-full grid-cols-3 h-8 bg-secondary/70 p-0.5">
-            <TabsTrigger value="TODOS" className="text-[11px] px-1.5 h-7">
-              Todos
-            </TabsTrigger>
-            <TabsTrigger value="BACHILLERATO" className="text-[11px] px-1.5 h-7">
-              Prepas
-            </TabsTrigger>
-            <TabsTrigger value="LICENCIATURA" className="text-[11px] px-1.5 h-7">
-              Facult.
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {perfil?.rol === 'NUEVO_INGRESO' ? (
+          <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+            Bachillerato y Licenciatura
+          </div>
+        ) : perfil?.rol === 'UNIDAD_ACADEMICA' ? (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            Unidad Académica Asignada
+          </div>
+        ) : (
+          <Tabs
+            value={nivel}
+            onValueChange={(value) => onNivelChange(value as NivelFilter)}
+          >
+            <TabsList className="grid h-8 w-full grid-cols-3 bg-secondary/70 p-0.5">
+              <TabsTrigger value="TODOS" className="h-7 px-1.5 text-[11px]">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="BACHILLERATO" className="h-7 px-1.5 text-[11px]">
+                Prepas
+              </TabsTrigger>
+              <TabsTrigger value="LICENCIATURA" className="h-7 px-1.5 text-[11px]">
+                Facult.
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
-      {/* Navegación por secciones */}
-      <nav aria-label="Navegación principal" className="flex-1 px-3 py-2 space-y-3.5">
+      <nav aria-label="Navegación principal" className="flex-1 space-y-3.5 px-3 py-2">
         {NAV_GROUPS.map((group) => {
           const isAdminUser = !perfil || perfil.rol === 'ADMIN'
           const visibleItems = group.items.filter(
@@ -176,10 +185,10 @@ export function DashboardSidebar({
                         onCloseMobile()
                       }}
                       className={cn(
-                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150',
+                        'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all duration-150',
                         isActive
-                          ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
-                          : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground border border-transparent'
+                          ? 'border-primary/20 bg-primary/10 font-semibold text-primary'
+                          : 'border-transparent text-muted-foreground hover:bg-secondary/70 hover:text-foreground'
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
@@ -193,8 +202,7 @@ export function DashboardSidebar({
         })}
       </nav>
 
-      {/* Tarjeta de Usuario y Salida */}
-      <div className="border-t border-border p-3 space-y-2">
+      <div className="space-y-2 border-t border-border p-3">
         <div className="flex items-center gap-2.5 rounded-lg bg-secondary/40 px-2.5 py-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {initials}
@@ -212,7 +220,7 @@ export function DashboardSidebar({
           variant="ghost"
           size="sm"
           onClick={onLogout}
-          className="w-full justify-start gap-2 h-8 px-2.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
+          className="h-8 w-full justify-start gap-2 px-2.5 text-xs text-muted-foreground transition-all duration-150 hover:bg-destructive/10 hover:text-destructive"
         >
           <LogOut className="h-3.5 w-3.5" />
           <span>{perfil ? 'Cerrar sesión' : 'Volver al login'}</span>
@@ -223,10 +231,8 @@ export function DashboardSidebar({
 
   return (
     <>
-      {/* Sidebar fijo en escritorio */}
-      <aside className="hidden lg:block h-screen shrink-0">{sidebarContent}</aside>
+      <aside className="hidden h-screen shrink-0 lg:block">{sidebarContent}</aside>
 
-      {/* Drawer móvil */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div

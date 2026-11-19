@@ -30,12 +30,14 @@ Regla de formato: **nada de emojis** en la interfaz ni en etiquetas; usa iconos 
 3. Inspecciona los tokens y componentes reales del codigo:
    - Variables CSS y tema: `src/index.css`, `tailwind.config.*`, `components.json` y hook de tema (ej. `src/app/useTheme.ts`).
    - Primitivos instalados: `src/components/ui/` (para reutilizar `Button`, `Card`, `Dialog`, `Table`, `Tabs`, `Badge`, `Select`, `Input`, `Checkbox`, `Switch`, `Sonner`, etc. sin reinventar componentes).
+4. **Context7 (si esta habilitado):**
+   - Si el MCP `context7` (`resolve-library-id` y `query-docs`) esta disponible, consulta APIs vigentes, funciones nuevas y buenas practicas de React 19, Tailwind CSS, Radix UI, `shadcn/ui` y `lucide-react` segun las versiones de `package.json`.
 
 ---
 
 ## Paso 2: Definir la Propuesta Visual del Issue
 
-Antes de escribir o ajustar componentes, alinea estos 5 puntos con [design-checklist.md](./references/design-checklist.md):
+Antes de escribir o ajustar componentes, alinea estos 5 puntos con [design-checklist.md](./references/design-checklist.md) y aplica buenas practicas de **Clean Code en React** (no reinventar componentes ya existentes en `src/components/ui/`, extraer subcomponentes y hooks para mantener vistas pequenas, usar **early returns** en lugar de `if` anidados o ternarios profundos en JSX, calcular estado derivado en render sin `useEffect` innecesarios y evitar `any`):
 
 1. **Tokens semanticos (Prohibido hex hardcodeado):**
    - Usa exclusivamente clases conectadas a las variables del tema (`bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `bg-secondary`, `border-border`, `bg-primary`, `text-destructive` y tokens de marca definidos en Tailwind como `bg-uas-blue` / `text-uas-gold` si existen en el proyecto).

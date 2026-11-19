@@ -38,6 +38,12 @@ Regla de formato: **nada de emojis** en codigo, comentarios, logs ni documentaci
 
 Respeta siempre la configuracion estricta de TypeScript y lint del repo (en proyectos Vite/React modernos: `import type` si `verbatimModuleSyntax: true`, cero `enum` TS si `erasableSyntaxOnly: true`, cero variables sin usar, y utilidades fuera de archivos `.tsx` si aplica `react-refresh/only-export-components`).
 
+### Documentacion Vigente (Context7) y Clean Code
+- **Context7 (si esta habilitado):** antes de implementar con librerias clave del `package.json` (React 19, `@supabase/supabase-js`, Tailwind CSS, Radix/shadcn, ExcelJS, etc.), consulta el MCP `context7` (`resolve-library-id` y `query-docs`) para aprovechar funciones nuevas, APIs vigentes y buenas practicas oficiales de la version instalada.
+- **No reinventar la rueda:** reutiliza los primitivos de `src/components/ui/`, helpers de `src/lib/` y `src/services/shared/`, funciones nativas de PostgreSQL y librerias ya instaladas antes de escribir utilidades manuales o duplicar logica.
+- **Clean Code y control de flujo plano:** escribe funciones pequenas y de responsabilidad unica; usa **early returns / guard clauses** para **no anidar `if`**, y reemplaza cadenas largas de `if/else` o bloques repetidos por mapas, tablas de configuracion o helpers parametrizados.
+- **Buenas practicas de React y TypeScript:** separa logica/estado en hooks (`src/features/<feature>/hooks/`) y presentacion en componentes puros; evita `useEffect` para estado derivado (calculalo en render), evita `any`, no mutes estado y usa `keys` estables en listas.
+
 ### A. PostgreSQL como Backend
 - **Sin duplicar autoridad en frontend:** validaciones matematicas (`CHECK`), unicidad (`UNIQUE`), integridad historica (`ON DELETE RESTRICT`) y aislamiento de roles (`RLS`) viven en Postgres; el frontend brinda UX preventiva y traduce errores.
 - **Si el issue requiere DDL / RLS / RPC:**
@@ -75,5 +81,15 @@ Consulta [postgres-testing-guide.md](./references/postgres-testing-guide.md) par
 ## Paso 4: Cierre del Issue
 
 1. Actualiza `ContexIA/MEMORY.md` (sin emojis) si el issue completa un hito o modulo clave.
-2. Reporta archivos tocados, resultado real de cada comando ejecutado y cobertura contra los criterios del issue.
-3. Si el usuario lo solicita, publica un resumen en el issue con `gh issue comment <NUMERO> -R <ORG>/<REPO> --body "..."`.
+2. Si todos los criterios de aceptacion y verificaciones aplicables pasaron (sin bloqueos pendientes):
+   - Si el cuerpo del issue tiene checklists de criterios (`- [ ]`), opcionalmente actualizalos a `- [x]` con `gh issue edit <NUMERO> -R <ORG>/<REPO> --body "..."`.
+   - Cierra el issue marcandolo como finalizado con su resumen de verificacion (sin emojis, siempre con `-R <ORG>/<REPO>` y sin pipes ni redirecciones):
+     ```bash
+     gh issue close <NUMERO> -R <ORG>/<REPO> --reason completed --comment "<resumen de cambios, pruebas ejecutadas y criterios cumplidos>"
+     ```
+   - Si el repositorio esta vinculado a un GitHub Project v2, consulta `gh project list --owner <ORG> --format json`, `gh project field-list <PROJECT_NUM> --owner <ORG> --format json` y `gh project item-list <PROJECT_NUM> --owner <ORG> --format json`; si el issue aparece en el tablero, cambia su campo `Status` a `Done` con:
+     ```bash
+     gh project item-edit --project-id <PROJECT_ID> --id <ITEM_ID> --field-id <STATUS_FIELD_ID> --single-select-option-id <DONE_OPTION_ID>
+     ```
+   - Si alguna prueba critica (por ejemplo la simulacion contra BD) no pudo ejecutarse en el entorno actual, reporta el estado pendiente y pide confirmacion antes de cerrar el issue.
+3. Reporta al usuario los archivos tocados, el resultado real de cada comando ejecutado, el estado final del issue/proyecto en GitHub y la cobertura contra los criterios del issue.

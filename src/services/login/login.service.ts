@@ -24,7 +24,7 @@ export interface AuthSessionResult {
 }
 
 const PERFIL_SELECT =
-  'id, email, nombre, rol, activo, created_at, updated_at' as const
+  'id, email, nombre, rol, unidad_academica_id, activo, created_at, updated_at' as const
 
 async function signOutQuietly(): Promise<void> {
   try {

@@ -1,85 +1,113 @@
 import {
   PROGRAMAS_EDUCATIVOS_CATALOGO,
-  TIPOS_TRAMITE_CATALOGO,
   UNIDADES_ACADEMICAS_CATALOGO,
 } from '@/features/tramites/components/tramitesMockData'
+import type { Enums } from '@/types/database.types'
 
-export type TipoActaKey = 'ORDINARIA' | 'EXTRAORDINARIA'
+export type TipoActaKey = Enums<'tipo_acta'>
+export type EstadoActa = Enums<'estado_acta'>
 
-export interface TramiteConteoPrograma {
-  tipoTramiteId: number
-  tramiteNombre: string
-  enviadas: number
-  resueltas: number
-  pendientes: number
-  conError: number
-}
-
-export interface ProgramaChecklistItem {
+export interface ActaMatrixRow {
   programaId: number
   unidadAcademicaId: number
+  claveUa: string
+  nombreUa: string
+  nivel: 'BACHILLERATO' | 'LICENCIATURA'
   clavePrograma: string
   nombrePrograma: string
-  actasResueltas: Record<TipoActaKey, boolean>
-  tramitesPorTipo: Record<number, TramiteConteoPrograma>
+  estados: Record<TipoActaKey, EstadoActa>
 }
 
-export const TIPOS_ACTA_TABS: { id: TipoActaKey; label: string }[] = [
-  { id: 'ORDINARIA', label: 'Actas Ordinarias' },
-  { id: 'EXTRAORDINARIA', label: 'Actas Extraordinarias' },
+export interface ActaColumnMeta {
+  key: TipoActaKey
+  shortLabel: string
+  label: string
+  headerClass: string
+}
+
+export const ACTA_COLUMNS: ActaColumnMeta[] = [
+  {
+    key: 'ORDINARIA',
+    shortLabel: 'Ord.',
+    label: 'Ordinaria',
+    headerClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  },
+  {
+    key: 'EXTRAORDINARIA',
+    shortLabel: 'Ext.',
+    label: 'Extraordinaria',
+    headerClass: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
+  },
+  {
+    key: 'REGULARIZACION',
+    shortLabel: 'Reg.',
+    label: 'Regularización',
+    headerClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  },
 ]
 
-export function buildInitialProgramasChecklist(): ProgramaChecklistItem[] {
+/**
+ * Un programa esta completo cuando ninguna de sus 3 actas sigue en PENDIENTE.
+ */
+export function isActaRowCompleted(row: ActaMatrixRow): boolean {
+  return ACTA_COLUMNS.every(
+    (col) => row.estados[col.key] !== 'PENDIENTE'
+  )
+}
+
+export function getActaRowProgress(row: ActaMatrixRow): {
+  done: number
+  totalAplicables: number
+} {
+  let done = 0
+  let totalAplicables = 0
+  for (const col of ACTA_COLUMNS) {
+    const estado = row.estados[col.key]
+    if (estado !== 'NO_APLICA') {
+      totalAplicables += 1
+      if (estado === 'GENERADA') {
+        done += 1
+      }
+    }
+  }
+  return { done, totalAplicables }
+}
+
+export function buildInitialActasMatrix(): ActaMatrixRow[] {
+  const uaMap = new Map(UNIDADES_ACADEMICAS_CATALOGO.map((u) => [u.id, u]))
+
   return PROGRAMAS_EDUCATIVOS_CATALOGO.map((prog) => {
-    // Dejar unidades 2 (8210 Concordia), 4 (8230 Escuinapa) y 8 (4820 Ciencias Sociales)
-    // completamente resueltas en ORDINARIA para mostrar ambas listas desde el inicio.
-    const isUnitFullyResolvedOrd =
-      prog.unidadAcademicaId === 2 ||
-      prog.unidadAcademicaId === 4 ||
-      prog.unidadAcademicaId === 8
-
-    // En 4800 (Fac. Informática, id=6), dejar el programa 1 resuelto y 4, 5 pendientes como en la imagen de referencia
-    const isProg1OfInformatica = prog.id === 601
-
-    const ordinariaResuelta = isUnitFullyResolvedOrd || isProg1OfInformatica
-    const extraordinariaResuelta =
+    const ua = uaMap.get(prog.unidadAcademicaId)
+    const isCompletedUnit =
       prog.unidadAcademicaId === 2 || prog.unidadAcademicaId === 8
+    const isPartialInformatica = prog.id === 601
+    const isPartialMazatlan = prog.id === 101
 
-    const defaultTramite = TIPOS_TRAMITE_CATALOGO[2] // Convalidación
-    const initialCounts: Record<number, TramiteConteoPrograma> = {}
-
-    if (prog.id === 601) {
-      initialCounts[defaultTramite.id] = {
-        tipoTramiteId: defaultTramite.id,
-        tramiteNombre: defaultTramite.nombre,
-        enviadas: 50,
-        resueltas: 20,
-        pendientes: 10,
-        conError: 0,
-      }
-    } else if (prog.id === 701) {
-      initialCounts[1] = {
-        tipoTramiteId: 1,
-        tramiteNombre: TIPOS_TRAMITE_CATALOGO[0].nombre,
-        enviadas: 35,
-        resueltas: 28,
-        pendientes: 5,
-        conError: 2,
-      }
+    const estados: Record<TipoActaKey, EstadoActa> = {
+      ORDINARIA:
+        isCompletedUnit || isPartialInformatica || isPartialMazatlan
+          ? 'GENERADA'
+          : 'PENDIENTE',
+      EXTRAORDINARIA:
+        isCompletedUnit || isPartialInformatica ? 'GENERADA' : 'PENDIENTE',
+      REGULARIZACION: isCompletedUnit
+        ? 'GENERADA'
+        : prog.unidadAcademicaId === 4
+          ? 'NO_APLICA'
+          : 'PENDIENTE',
     }
 
     return {
       programaId: prog.id,
       unidadAcademicaId: prog.unidadAcademicaId,
+      claveUa: ua?.claveUa ?? '',
+      nombreUa: ua?.nombre ?? '',
+      nivel: ua?.nivel ?? 'LICENCIATURA',
       clavePrograma: prog.clavePrograma,
       nombrePrograma: prog.nombre,
-      actasResueltas: {
-        ORDINARIA: ordinariaResuelta,
-        EXTRAORDINARIA: extraordinariaResuelta,
-      },
-      tramitesPorTipo: initialCounts,
+      estados,
     }
   })
 }
 
-export { UNIDADES_ACADEMICAS_CATALOGO, TIPOS_TRAMITE_CATALOGO }
+export { UNIDADES_ACADEMICAS_CATALOGO }

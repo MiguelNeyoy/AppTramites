@@ -1,5 +1,16 @@
 import * as React from 'react'
-import { AlertTriangle, Eye, EyeOff, Mail, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import {
+  AlertTriangle,
+  Building2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Mail,
+  Save,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -21,6 +32,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import type { UnidadAcademicaCatalogo } from '@/services/catalogos'
+import {
+  checkAdminIntegrityGuard,
+  validateCreateUsuarioInput,
+  validateUpdateUsuarioInput,
+} from '@/services/usuarios'
 import {
   ROL_DIVISION_OPTIONS,
   type CreateUsuarioPayload,
@@ -33,18 +50,22 @@ interface UsuarioFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialData: UsuarioPerfilRow | null
+  unidades: UnidadAcademicaCatalogo[]
   activeAdminsCount: number
   currentUserId?: string
-  onSaveCreate: (payload: CreateUsuarioPayload) => void
-  onSaveUpdate: (payload: UpdateUsuarioPayload) => void
+  isSubmitting?: boolean
+  onSaveCreate: (payload: CreateUsuarioPayload) => Promise<boolean | void> | boolean | void
+  onSaveUpdate: (payload: UpdateUsuarioPayload) => Promise<boolean | void> | boolean | void
 }
 
 export function UsuarioFormModal({
   open,
   onOpenChange,
   initialData,
+  unidades,
   activeAdminsCount,
   currentUserId,
+  isSubmitting = false,
   onSaveCreate,
   onSaveUpdate,
 }: UsuarioFormModalProps) {
@@ -54,64 +75,92 @@ export function UsuarioFormModal({
   const [rol, setRol] = React.useState<RolUsuario>(
     initialData?.rol ?? 'LICENCIATURA'
   )
+  const [unidadAcademicaId, setUnidadAcademicaId] = React.useState<string>(
+    initialData?.unidad_academica_id
+      ? String(initialData.unidad_academica_id)
+      : ''
+  )
   const [activo, setActivo] = React.useState<boolean>(
     initialData?.activo ?? true
   )
   const [passwordTemporal, setPasswordTemporal] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
 
-  const isLastActiveAdmin = Boolean(
-    initialData &&
-      initialData.rol === 'ADMIN' &&
-      initialData.activo &&
-      activeAdminsCount <= 1
-  )
   const isSelf = Boolean(initialData && currentUserId === initialData.id)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRolChange = (nextRol: RolUsuario) => {
+    setRol(nextRol)
+    if (nextRol !== 'UNIDAD_ACADEMICA') {
+      setUnidadAcademicaId('')
+    }
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!nombre.trim()) {
-      toast.error('Ingresa el nombre completo del usuario.')
-      return
-    }
-
-    const trimmedEmail = email.trim().toLowerCase()
-    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      toast.error('Ingresa un correo electrónico válido.')
-      return
-    }
-
-    if (isLastActiveAdmin && (rol !== 'ADMIN' || !activo)) {
-      toast.error('Debe permanecer al menos un administrador activo en el sistema.')
-      return
-    }
+    const parsedUnitId =
+      rol === 'UNIDAD_ACADEMICA' && unidadAcademicaId
+        ? Number(unidadAcademicaId)
+        : null
 
     if (initialData) {
-      onSaveUpdate({
+      const guardError = checkAdminIntegrityGuard({
+        targetUser: initialData,
+        nextRol: rol,
+        nextActivo: activo,
+        activeAdminsCount,
+        currentUserId,
+      })
+      if (guardError) {
+        toast.error(guardError)
+        return
+      }
+
+      const payload: UpdateUsuarioPayload = {
         id: initialData.id,
-        nombre: nombre.trim(),
-        email: trimmedEmail,
+        nombre,
+        email,
         rol,
+        unidad_academica_id: parsedUnitId,
         activo,
-      })
-    } else {
-      onSaveCreate({
-        nombre: nombre.trim(),
-        email: trimmedEmail,
-        rol,
-        activo,
-        passwordTemporal: passwordTemporal.trim() || undefined,
-      })
+      }
+      const validation = validateUpdateUsuarioInput(payload)
+      if (!validation.valid) {
+        toast.error(validation.error)
+        return
+      }
+
+      const result = await onSaveUpdate(payload)
+      if (result !== false) {
+        onOpenChange(false)
+      }
+      return
     }
 
-    onOpenChange(false)
+    const payload: CreateUsuarioPayload = {
+      nombre,
+      email,
+      rol,
+      unidad_academica_id: parsedUnitId,
+      activo,
+      passwordTemporal,
+    }
+    const validation = validateCreateUsuarioInput(payload)
+    if (!validation.valid) {
+      toast.error(validation.error)
+      return
+    }
+
+    const result = await onSaveCreate(payload)
+    if (result !== false) {
+      onOpenChange(false)
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md gap-0 overflow-hidden border-border bg-card p-0 text-foreground sm:rounded-xl">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => void handleSubmit(e)}>
           <DialogHeader className="border-b border-border px-5 py-4 pr-10 text-left">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
@@ -133,7 +182,6 @@ export function UsuarioFormModal({
           </DialogHeader>
 
           <div className="space-y-4 px-5 py-4">
-            {/* Campo 1: Nombre */}
             <div className="space-y-1.5">
               <Label
                 htmlFor="usr-nombre"
@@ -146,11 +194,11 @@ export function UsuarioFormModal({
                 placeholder="Ej. Iris Encargada Licenciatura"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
+                disabled={isSubmitting}
                 className="h-9 bg-background text-xs"
               />
             </div>
 
-            {/* Campo 2: Correo */}
             <div className="space-y-1.5">
               <Label
                 htmlFor="usr-email"
@@ -166,12 +214,12 @@ export function UsuarioFormModal({
                   placeholder="usuario@uas.edu.mx"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
                   className="h-9 bg-background pl-8 font-mono text-xs"
                 />
               </div>
             </div>
 
-            {/* Campo 3: División / Rol (ENUM rol_usuario en PostgreSQL) */}
             <div className="space-y-1.5">
               <Label
                 htmlFor="usr-rol"
@@ -181,8 +229,8 @@ export function UsuarioFormModal({
               </Label>
               <Select
                 value={rol}
-                onValueChange={(value) => setRol(value as RolUsuario)}
-                disabled={isSelf}
+                onValueChange={(value) => handleRolChange(value as RolUsuario)}
+                disabled={isSelf || isSubmitting}
               >
                 <SelectTrigger id="usr-rol" className="h-9 bg-background text-xs">
                   <SelectValue />
@@ -209,22 +257,64 @@ export function UsuarioFormModal({
               )}
             </div>
 
-            {/* Campo 4 (Alta): Contraseña inicial opcional lista para Supabase Auth */}
+            {rol === 'UNIDAD_ACADEMICA' && (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="usr-unidad"
+                  className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+                >
+                  Unidad Académica Asignada *
+                </Label>
+                <Select
+                  value={unidadAcademicaId}
+                  onValueChange={setUnidadAcademicaId}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger
+                    id="usr-unidad"
+                    className="h-9 bg-background text-xs"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <SelectValue placeholder="Selecciona escuela o facultad (ej. 4800)" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unidades.map((ua) => (
+                      <SelectItem
+                        key={ua.id}
+                        value={String(ua.id)}
+                        className="text-xs"
+                      >
+                        <span className="font-mono font-semibold">
+                          {ua.claveUa}
+                        </span>
+                        <span className="ml-1.5 text-muted-foreground">
+                          &mdash; {ua.nombre}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {!isEditing && (
               <div className="space-y-1.5">
                 <Label
                   htmlFor="usr-password"
                   className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
                 >
-                  Contraseña Inicial (Para alta en Auth)
+                  Contraseña Inicial *
                 </Label>
                 <div className="relative">
                   <Input
                     id="usr-password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Mínimo 8 caracteres (opcional en UI)"
+                    placeholder="Mínimo 8 caracteres"
                     value={passwordTemporal}
                     onChange={(e) => setPasswordTemporal(e.target.value)}
+                    disabled={isSubmitting}
                     className="h-9 bg-background pr-9 font-mono text-xs"
                   />
                   <Button
@@ -247,7 +337,6 @@ export function UsuarioFormModal({
               </div>
             )}
 
-            {/* Campo 5: Estado Activo */}
             <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2.5">
               <div>
                 <Label
@@ -264,7 +353,7 @@ export function UsuarioFormModal({
                 id="usr-activo"
                 checked={activo}
                 onCheckedChange={setActivo}
-                disabled={isSelf}
+                disabled={isSelf || isSubmitting}
               />
             </div>
           </div>
@@ -274,6 +363,7 @@ export function UsuarioFormModal({
               type="button"
               variant="outline"
               size="sm"
+              disabled={isSubmitting}
               onClick={() => onOpenChange(false)}
               className="h-8 text-xs"
             >
@@ -282,9 +372,14 @@ export function UsuarioFormModal({
             <Button
               type="submit"
               size="sm"
+              disabled={isSubmitting}
               className="h-8 gap-1.5 bg-primary font-bold text-xs text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90"
             >
-              <Save className="h-3.5 w-3.5" />
+              {isSubmitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
               <span>{isEditing ? 'Guardar cambios' : 'Crear usuario'}</span>
             </Button>
           </DialogFooter>
@@ -296,15 +391,27 @@ export function UsuarioFormModal({
 
 interface ConfirmarEliminarUsuarioModalProps {
   usuario: UsuarioPerfilRow | null
+  isSubmitting?: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (usuario: UsuarioPerfilRow) => void
+  onConfirm: (usuario: UsuarioPerfilRow) => Promise<boolean | void> | boolean | void
 }
 
 export function ConfirmarEliminarUsuarioModal({
   usuario,
+  isSubmitting = false,
   onOpenChange,
   onConfirm,
 }: ConfirmarEliminarUsuarioModalProps) {
+  const handleConfirm = async () => {
+    if (!usuario) {
+      return
+    }
+    const result = await onConfirm(usuario)
+    if (result !== false) {
+      onOpenChange(false)
+    }
+  }
+
   return (
     <Dialog open={Boolean(usuario)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm gap-0 overflow-hidden border-border bg-card p-0 text-foreground sm:rounded-xl">
@@ -331,7 +438,7 @@ export function ConfirmarEliminarUsuarioModal({
             <span className="font-mono">{usuario?.email}</span>)?
           </p>
           <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-[11px] text-muted-foreground leading-relaxed">
-            Nota: si el usuario ya capturó trámites o actas en el historial, en base de datos conviene desactivarlo con el interruptor Activo para conservar trazabilidad.
+            Nota: si el usuario ya capturó trámites o actas en el historial, PostgreSQL protege su trazabilidad y deberás desactivarlo con el interruptor Activo.
           </p>
         </div>
 
@@ -340,6 +447,7 @@ export function ConfirmarEliminarUsuarioModal({
             type="button"
             variant="outline"
             size="sm"
+            disabled={isSubmitting}
             onClick={() => onOpenChange(false)}
             className="h-8 text-xs"
           >
@@ -349,15 +457,15 @@ export function ConfirmarEliminarUsuarioModal({
             type="button"
             variant="destructive"
             size="sm"
-            onClick={() => {
-              if (usuario) {
-                onConfirm(usuario)
-              }
-              onOpenChange(false)
-            }}
+            disabled={isSubmitting}
+            onClick={() => void handleConfirm()}
             className="h-8 gap-1.5 font-semibold text-xs"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            {isSubmitting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
             <span>Eliminar</span>
           </Button>
         </DialogFooter>

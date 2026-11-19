@@ -7,7 +7,6 @@ import {
   Loader2,
   Pencil,
   Plus,
-  RefreshCw,
   Search,
   Trash2,
 } from 'lucide-react'
@@ -40,7 +39,7 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
-import type { NivelFilter } from '@/features/dashboard/components/dashboardMockData'
+import type { NivelFilter } from '@/features/dashboard/types'
 import type {
   PeriodoEscolarCatalogo,
   PeriodoEscolarInput,
@@ -62,12 +61,18 @@ import {
 
 interface CatalogosViewProps {
   nivel: NivelFilter
+  refreshSignal?: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 type CatalogoTab = 'unidades' | 'tramites' | 'periodos'
 type EstadoFilter = 'TODOS' | 'ACTIVOS' | 'INACTIVOS'
 
-export function CatalogosView({ nivel }: CatalogosViewProps) {
+export function CatalogosView({
+  nivel,
+  refreshSignal,
+  onLoadingChange,
+}: CatalogosViewProps) {
   const [activeTab, setActiveTab] = React.useState<CatalogoTab>('unidades')
   const [localNivelFilter, setLocalNivelFilter] = React.useState<NivelFilter>('TODOS')
   const [searchQuery, setSearchQuery] = React.useState('')
@@ -95,6 +100,26 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
     togglePeriodoActivo,
     removeItem,
   } = useCatalogos()
+
+  const reloadRef = React.useRef(reload)
+  const prevRefreshSignalRef = React.useRef(refreshSignal)
+  React.useEffect(() => {
+    reloadRef.current = reload
+  }, [reload])
+
+  React.useEffect(() => {
+    if (
+      refreshSignal !== undefined &&
+      refreshSignal !== prevRefreshSignalRef.current
+    ) {
+      prevRefreshSignalRef.current = refreshSignal
+      void reloadRef.current()
+    }
+  }, [refreshSignal])
+
+  React.useEffect(() => {
+    onLoadingChange?.(isLoading)
+  }, [isLoading, onLoadingChange])
 
   const [selectedUnidadId, setSelectedUnidadId] = React.useState<number>(0)
 
@@ -242,52 +267,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Encabezado + CTA único primario dorado */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">
-            Catálogos Institucionales
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Administración de unidades académicas, programas educativos, tipos de trámite y periodos escolares.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void reload()}
-            disabled={isLoading || isMutating}
-            className="h-9 gap-1.5 text-xs"
-          >
-            <RefreshCw
-              className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')}
-            />
-            <span>Actualizar</span>
-          </Button>
-
-          <Button
-            type="button"
-            size="sm"
-            disabled={isMutating}
-            onClick={openCreatePrimaryAction}
-            className="h-9 gap-1.5 bg-primary font-bold text-xs text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4" />
-            <span>
-              {activeTab === 'unidades'
-                ? 'Nueva Unidad Académica'
-                : activeTab === 'tramites'
-                  ? 'Nuevo Tipo de Trámite'
-                  : 'Nuevo Periodo Escolar'}
-            </span>
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {isOfflinePreview && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-foreground">
           <span>
@@ -297,7 +277,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
       )}
 
       {/* Pestañas Principales del Catálogo */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:pr-24">
         <Tabs
           value={activeTab}
           onValueChange={(value) => {
@@ -342,72 +322,93 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
         )}
       </div>
 
-      {/* Barra de Búsqueda y Filtros */}
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={
-              activeTab === 'unidades'
-                ? 'Buscar por clave UA, preparatoria, facultad o programa educativo...'
-                : activeTab === 'tramites'
-                  ? 'Buscar por nombre de trámite...'
-                  : 'Buscar por ciclo escolar, número de periodo o fecha...'
-            }
-            className="h-8 bg-background pl-8 text-xs"
-          />
-        </div>
-
-        {activeTab === 'tramites' && (
-          <div className="w-full sm:w-48">
-            <Select
-              value={moduloFilter}
-              onValueChange={(v) =>
-                setModuloFilter(
-                  v as 'TODOS' | 'TRAMITES_GENERALES' | 'NUEVO_INGRESO'
-                )
+      {/* Barra de Búsqueda, Filtros y Acción Principal */}
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-1 flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                activeTab === 'unidades'
+                  ? 'Buscar por clave UA, preparatoria, facultad o programa educativo...'
+                  : activeTab === 'tramites'
+                    ? 'Buscar por nombre de trámite...'
+                    : 'Buscar por ciclo escolar, número de periodo o fecha...'
               }
+              className="h-8 bg-background pl-8 text-xs"
+            />
+          </div>
+
+          {activeTab === 'tramites' && (
+            <div className="w-full sm:w-48">
+              <Select
+                value={moduloFilter}
+                onValueChange={(v) =>
+                  setModuloFilter(
+                    v as 'TODOS' | 'TRAMITES_GENERALES' | 'NUEVO_INGRESO'
+                  )
+                }
+              >
+                <SelectTrigger className="h-8 bg-background text-xs">
+                  <SelectValue placeholder="Módulo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS" className="text-xs">
+                    Todos los módulos
+                  </SelectItem>
+                  <SelectItem value="TRAMITES_GENERALES" className="text-xs">
+                    Trámites Generales
+                  </SelectItem>
+                  <SelectItem value="NUEVO_INGRESO" className="text-xs">
+                    Nuevo Ingreso
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="w-full sm:w-40">
+            <Select
+              value={estadoFilter}
+              onValueChange={(v) => setEstadoFilter(v as EstadoFilter)}
             >
               <SelectTrigger className="h-8 bg-background text-xs">
-                <SelectValue placeholder="Módulo" />
+                <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="TODOS" className="text-xs">
-                  Todos los módulos
+                  Todos los estados
                 </SelectItem>
-                <SelectItem value="TRAMITES_GENERALES" className="text-xs">
-                  Trámites Generales
+                <SelectItem value="ACTIVOS" className="text-xs">
+                  Solo activos
                 </SelectItem>
-                <SelectItem value="NUEVO_INGRESO" className="text-xs">
-                  Nuevo Ingreso
+                <SelectItem value="INACTIVOS" className="text-xs">
+                  Solo inactivos
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
-        )}
+        </div>
 
-        <div className="w-full sm:w-40">
-          <Select
-            value={estadoFilter}
-            onValueChange={(v) => setEstadoFilter(v as EstadoFilter)}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={isMutating}
+            onClick={openCreatePrimaryAction}
+            className="h-9 gap-1.5 bg-primary font-bold text-xs text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90"
           >
-            <SelectTrigger className="h-8 bg-background text-xs">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TODOS" className="text-xs">
-                Todos los estados
-              </SelectItem>
-              <SelectItem value="ACTIVOS" className="text-xs">
-                Solo activos
-              </SelectItem>
-              <SelectItem value="INACTIVOS" className="text-xs">
-                Solo inactivos
-              </SelectItem>
-            </SelectContent>
-          </Select>
+            <Plus className="h-4 w-4" />
+            <span>
+              {activeTab === 'unidades'
+                ? 'Nueva Unidad Académica'
+                : activeTab === 'tramites'
+                  ? 'Nuevo Tipo de Trámite'
+                  : 'Nuevo Periodo Escolar'}
+            </span>
+          </Button>
         </div>
       </div>
 
@@ -420,29 +421,13 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
           </CardContent>
         </Card>
       ) : activeTab === 'unidades' ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
           {/* Maestro: Tabla de Unidades Académicas y Preparatorias */}
           <Card className="lg:col-span-7 border-border bg-card shadow-sm dark:shadow-none">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base font-bold">
-                    Unidades Académicas y Preparatorias
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Selecciona una unidad para visualizar y gestionar sus programas educativos
-                  </CardDescription>
-                </div>
-                <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
-                  {unidadesFiltered.length} mostradas
-                </Badge>
-              </div>
-            </CardHeader>
-
-            <CardContent>
+            <CardContent className="pt-4">
               <div className="rounded-lg border border-border overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-secondary/50">
+                <Table wrapperClassName="max-h-[520px] overflow-y-auto">
+                  <TableHeader className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="h-9 text-[10px] font-semibold uppercase tracking-widest">
                         Clave UA
@@ -577,7 +562,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
           </Card>
 
           {/* Detalle: Programas Educativos de la Unidad Seleccionada */}
-          <Card className="lg:col-span-5 border-border bg-card shadow-sm dark:shadow-none">
+          <Card className="lg:col-span-5 lg:sticky lg:top-4 border-border bg-card shadow-sm dark:shadow-none">
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -612,7 +597,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-2.5 pt-4">
+            <CardContent className="max-h-[480px] space-y-2.5 overflow-y-auto pt-4">
               {!activeSelectedUnidad ? (
                 <div className="rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
                   Elige una unidad académica de la tabla para ver sus programas.
@@ -696,23 +681,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
       ) : activeTab === 'tramites' ? (
         /* TAB 2: Catálogo de Tipos de Trámite */
         <Card className="border-border bg-card shadow-sm dark:shadow-none">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base font-bold">
-                  Catálogo de Tipos de Trámite
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Trámites generales y de nuevo ingreso disponibles para registro estadístico
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
-                {tramitesFiltered.length} trámites
-              </Badge>
-            </div>
-          </CardHeader>
-
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader className="bg-secondary/50">
@@ -846,23 +815,7 @@ export function CatalogosView({ nivel }: CatalogosViewProps) {
       ) : (
         /* TAB 3: Catálogo de Periodos Escolares */
         <Card className="border-border bg-card shadow-sm dark:shadow-none">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base font-bold">
-                  Catálogo de Periodos Escolares
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Ciclos escolares y periodos oficiales para registro de trámites y checklist de actas
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
-                {periodosFiltered.length} periodos
-              </Badge>
-            </div>
-          </CardHeader>
-
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader className="bg-secondary/50">

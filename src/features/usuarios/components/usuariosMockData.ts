@@ -1,27 +1,13 @@
-import type { Enums, Tables } from '@/types/database.types'
+import type {
+  CreateUsuarioInput,
+  RolUsuario,
+  UpdateUsuarioInput,
+  UsuarioPerfilRow,
+} from '@/services/usuarios'
 
-/**
- * Contrato tipado directo de `public.perfiles` en PostgreSQL/Supabase.
- * Al conectar la BD en la fase de logica, las respuestas de PostgREST encajan 1:1.
- */
-export type UsuarioPerfilRow = Tables<'perfiles'>
-export type RolUsuario = Enums<'rol_usuario'>
-
-export interface CreateUsuarioPayload {
-  nombre: string
-  email: string
-  rol: RolUsuario
-  activo: boolean
-  passwordTemporal?: string
-}
-
-export interface UpdateUsuarioPayload {
-  id: string
-  nombre: string
-  email: string
-  rol: RolUsuario
-  activo: boolean
-}
+export type { RolUsuario, UsuarioPerfilRow }
+export type CreateUsuarioPayload = CreateUsuarioInput
+export type UpdateUsuarioPayload = UpdateUsuarioInput
 
 export interface RolDivisionMeta {
   rol: RolUsuario
@@ -59,6 +45,13 @@ export const ROL_DIVISION_OPTIONS: RolDivisionMeta[] = [
     badgeClass:
       'border-purple-500/25 bg-purple-500/10 text-purple-600 dark:text-purple-400',
   },
+  {
+    rol: 'UNIDAD_ACADEMICA',
+    etiqueta: 'Unidad Académica',
+    division: 'Acotado a una Escuela / Facultad',
+    badgeClass:
+      'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  },
 ]
 
 export function getRolDivisionMeta(rol: RolUsuario): RolDivisionMeta {
@@ -76,6 +69,7 @@ export function buildInitialUsuariosMock(): UsuarioPerfilRow[] {
       nombre: 'Administrador URS',
       email: 'admin.escolares@uas.edu.mx',
       rol: 'ADMIN',
+      unidad_academica_id: null,
       activo: true,
       created_at: now,
       updated_at: now,
@@ -85,6 +79,7 @@ export function buildInitialUsuariosMock(): UsuarioPerfilRow[] {
       nombre: 'Iris Encargada Licenciatura',
       email: 'iris.licenciatura@uas.edu.mx',
       rol: 'LICENCIATURA',
+      unidad_academica_id: null,
       activo: true,
       created_at: now,
       updated_at: now,
@@ -94,6 +89,7 @@ export function buildInitialUsuariosMock(): UsuarioPerfilRow[] {
       nombre: 'Juan Carlos Encargado Prepas',
       email: 'juancarlos.prepas@uas.edu.mx',
       rol: 'BACHILLERATO',
+      unidad_academica_id: null,
       activo: true,
       created_at: now,
       updated_at: now,
@@ -103,6 +99,7 @@ export function buildInitialUsuariosMock(): UsuarioPerfilRow[] {
       nombre: 'Ismael Nuevo Ingreso',
       email: 'ismael.admision@uas.edu.mx',
       rol: 'NUEVO_INGRESO',
+      unidad_academica_id: null,
       activo: true,
       created_at: now,
       updated_at: now,

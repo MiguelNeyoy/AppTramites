@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
+      workbox: {
+        navigateFallbackDenylist: [/^\/(auth|rest|storage|realtime|functions)\//],
+      },
       manifest: {
         name: 'Trámites Escolares UAS',
         short_name: 'TrámitesUAS',

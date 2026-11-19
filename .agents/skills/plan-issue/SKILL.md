@@ -48,12 +48,18 @@ Lee solo los archivos necesarios para anclar el plan en la realidad del reposito
    - Identifica tablas, enums, llaves foraneas, funciones RPC y politicas RLS existentes antes de asumir columnas.
 3. **Estructura de codigo y UI:**
    - Revisa `package.json`, `tsconfig*.json`, la capa de acceso a datos (`src/services/`, `src/lib/` o convencion del repo) y la carpeta de UI del modulo afectado (ej. `src/features/<feature>/{components,hooks}/` y `src/components/ui/`).
+4. **Documentacion vigente con Context7 (si esta habilitado):**
+   - Si el MCP `context7` (`resolve-library-id` y `query-docs`) esta disponible, consulta las versiones reales de `package.json` (React 19, `@supabase/supabase-js`, Tailwind CSS, ExcelJS, etc.) para planificar usando funciones nuevas, APIs actuales y buenas practicas oficiales sin recurrir a patrones obsoletos.
 
 ---
 
 ## Paso 3: Disenar la Solucion en Dos Capas (Postgres-First)
 
 Cuando `ContexIA/MEMORY.md` o el stack indiquen que **no hay backend tradicional** y toda la logica critica vive en PostgreSQL:
+
+0. **Principios transversales (Clean Code y no reinventar la rueda):**
+   - Reutiliza componentes de `src/components/ui/`, utilidades de `src/lib/` y `src/services/shared/`, capacidades nativas de Postgres y paquetes ya presentes en `package.json` antes de proponer codigo nuevo duplicado.
+   - Proyecta funciones pequenas con **early returns** (sin `if` anidados), mapas de configuracion en lugar de condicionales extensos, hooks separados de componentes visuales y estado derivado sin `useEffect` innecesarios.
 
 1. **Matriz de Roles y Reglas de Negocio del Issue:**
    - Mapea cada rol del sistema contra los requisitos del issue.

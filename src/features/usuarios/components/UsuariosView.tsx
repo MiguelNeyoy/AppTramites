@@ -1,14 +1,13 @@
 import * as React from 'react'
 import {
+  Loader2,
   Lock,
   Pencil,
   Search,
-  ShieldCheck,
   Trash2,
   UserPlus,
   Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,13 +36,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useUsuarios } from '../hooks/useUsuarios'
 import {
   ConfirmarEliminarUsuarioModal,
   UsuarioFormModal,
 } from './UsuarioFormModal'
 import {
   ROL_DIVISION_OPTIONS,
-  buildInitialUsuariosMock,
   getRolDivisionMeta,
   type CreateUsuarioPayload,
   type RolUsuario,
@@ -54,18 +53,20 @@ import {
 interface UsuariosViewProps {
   /**
    * Indica si el usuario autenticado tiene rol ADMIN.
-   * Mientras no se conecte BD real (perfil null en bypass), permite vista previa de diseño.
+   * Mientras no se conecte sesion real (perfil null en bypass), permite vista previa de diseño.
    */
   isAdmin: boolean
   currentUserId?: string
   /**
-   * Callbacks opcionales preparados para conectar directamente con src/services/usuarios al implementar BD.
+   * Overrides opcionales para pruebas aisladas de UI.
    */
   usuariosExternos?: UsuarioPerfilRow[]
-  onCreateUsuario?: (payload: CreateUsuarioPayload) => void
-  onUpdateUsuario?: (payload: UpdateUsuarioPayload) => void
-  onToggleActivo?: (usuario: UsuarioPerfilRow, nextActivo: boolean) => void
-  onDeleteUsuario?: (usuario: UsuarioPerfilRow) => void
+  onCreateUsuario?: (payload: CreateUsuarioPayload) => Promise<boolean | void> | boolean | void
+  onUpdateUsuario?: (payload: UpdateUsuarioPayload) => Promise<boolean | void> | boolean | void
+  onToggleActivo?: (usuario: UsuarioPerfilRow, nextActivo: boolean) => Promise<boolean | void> | boolean | void
+  onDeleteUsuario?: (usuario: UsuarioPerfilRow) => Promise<boolean | void> | boolean | void
+  refreshSignal?: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 function getInitials(nombre: string): string {
@@ -83,10 +84,47 @@ export function UsuariosView({
   onUpdateUsuario,
   onToggleActivo,
   onDeleteUsuario,
+  refreshSignal,
+  onLoadingChange,
 }: UsuariosViewProps) {
-  const [localUsuarios, setLocalUsuarios] = React.useState<UsuarioPerfilRow[]>(
-    () => buildInitialUsuariosMock()
-  )
+  const {
+    usuarios: serviceUsuarios,
+    unidades,
+    isLoading,
+    isMutating,
+    isOfflinePreview,
+    reloadUsuarios,
+    handleCreateUsuario,
+    handleUpdateUsuario,
+    handleToggleActivo,
+    handleDeleteUsuario,
+  } = useUsuarios({
+    enabled: isAdmin && !usuariosExternos,
+    currentUserId,
+  })
+
+  const reloadRef = React.useRef(reloadUsuarios)
+  const prevRefreshSignalRef = React.useRef(refreshSignal)
+  React.useEffect(() => {
+    reloadRef.current = reloadUsuarios
+  }, [reloadUsuarios])
+
+  React.useEffect(() => {
+    if (
+      isAdmin &&
+      !usuariosExternos &&
+      refreshSignal !== undefined &&
+      refreshSignal !== prevRefreshSignalRef.current
+    ) {
+      prevRefreshSignalRef.current = refreshSignal
+      void reloadRef.current()
+    }
+  }, [isAdmin, usuariosExternos, refreshSignal])
+
+  React.useEffect(() => {
+    onLoadingChange?.(isLoading && isAdmin && !usuariosExternos)
+  }, [isLoading, isAdmin, usuariosExternos, onLoadingChange])
+
   const [searchQuery, setSearchQuery] = React.useState('')
   const [rolFilter, setRolFilter] = React.useState<'TODOS' | RolUsuario>('TODOS')
   const [estadoFilter, setEstadoFilter] = React.useState<
@@ -99,7 +137,12 @@ export function UsuariosView({
   const [deletingUsuario, setDeletingUsuario] =
     React.useState<UsuarioPerfilRow | null>(null)
 
-  const usuarios = usuariosExternos ?? localUsuarios
+  const usuarios = usuariosExternos ?? serviceUsuarios
+
+  const unidadesById = React.useMemo(
+    () => new Map(unidades.map((ua) => [ua.id, ua])),
+    [unidades]
+  )
 
   const activeAdminsCount = usuarios.filter(
     (u) => u.rol === 'ADMIN' && u.activo
@@ -110,6 +153,9 @@ export function UsuariosView({
     const q = searchQuery.trim().toLowerCase()
     return usuarios.filter((u) => {
       const meta = getRolDivisionMeta(u.rol)
+      const unit = u.unidad_academica_id
+        ? unidadesById.get(u.unidad_academica_id)
+        : undefined
       const matchesRol = rolFilter === 'TODOS' || u.rol === rolFilter
       const matchesEstado =
         estadoFilter === 'TODOS' ||
@@ -119,16 +165,18 @@ export function UsuariosView({
         u.nombre.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         meta.etiqueta.toLowerCase().includes(q) ||
-        meta.division.toLowerCase().includes(q)
+        meta.division.toLowerCase().includes(q) ||
+        (unit?.claveUa.toLowerCase().includes(q) ?? false) ||
+        (unit?.nombre.toLowerCase().includes(q) ?? false)
       return matchesRol && matchesEstado && matchesQuery
     })
-  }, [estadoFilter, rolFilter, searchQuery, usuarios])
+  }, [estadoFilter, rolFilter, searchQuery, unidadesById, usuarios])
 
-  // Protección visual estricta de rol ADMIN (en BD también debe existir RLS)
+  // Proteccion visual estricta de rol ADMIN (en BD vive la autorizacion real via RLS y RPC)
   if (!isAdmin) {
     return (
       <Card className="mx-auto max-w-lg border-border bg-card shadow-sm dark:shadow-none">
-        <CardHeader className="text-center space-y-2">
+        <CardHeader className="space-y-2 text-center">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <Lock className="h-5 w-5" />
           </div>
@@ -143,140 +191,21 @@ export function UsuariosView({
     )
   }
 
-  const handleCreate = (payload: CreateUsuarioPayload) => {
-    if (onCreateUsuario) {
-      onCreateUsuario(payload)
-      return
-    }
-    const now = new Date().toISOString()
-    const newRow: UsuarioPerfilRow = {
-      id: `local-${Date.now()}`,
-      nombre: payload.nombre,
-      email: payload.email,
-      rol: payload.rol,
-      activo: payload.activo,
-      created_at: now,
-      updated_at: now,
-    }
-    setLocalUsuarios((prev) => [newRow, ...prev])
-    toast.success(`Usuario "${payload.nombre}" agregado (vista previa local).`)
-  }
-
-  const handleUpdate = (payload: UpdateUsuarioPayload) => {
-    if (onUpdateUsuario) {
-      onUpdateUsuario(payload)
-      return
-    }
-    const now = new Date().toISOString()
-    setLocalUsuarios((prev) =>
-      prev.map((u) =>
-        u.id === payload.id
-          ? {
-              ...u,
-              nombre: payload.nombre,
-              email: payload.email,
-              rol: payload.rol,
-              activo: payload.activo,
-              updated_at: now,
-            }
-          : u
-      )
-    )
-    toast.success(`Usuario "${payload.nombre}" actualizado.`)
-  }
-
-  const handleToggleEstado = (usuario: UsuarioPerfilRow) => {
-    const nextActivo = !usuario.activo
-    if (
-      usuario.rol === 'ADMIN' &&
-      usuario.activo &&
-      activeAdminsCount <= 1
-    ) {
-      toast.error('Debe existir al menos un administrador activo.')
-      return
-    }
-    if (currentUserId === usuario.id) {
-      toast.error('No puedes desactivar tu propio usuario en sesión.')
-      return
-    }
-
-    if (onToggleActivo) {
-      onToggleActivo(usuario, nextActivo)
-      return
-    }
-    setLocalUsuarios((prev) =>
-      prev.map((u) =>
-        u.id === usuario.id ? { ...u, activo: nextActivo } : u
-      )
-    )
-    toast.info(
-      `"${usuario.nombre}" marcado como ${nextActivo ? 'activo' : 'inactivo'}.`
-    )
-  }
-
-  const handleConfirmDelete = (usuario: UsuarioPerfilRow) => {
-    if (currentUserId === usuario.id) {
-      toast.error('No puedes eliminar tu propio perfil.')
-      return
-    }
-    if (usuario.rol === 'ADMIN' && usuario.activo && activeAdminsCount <= 1) {
-      toast.error('Debe permanecer al menos un administrador activo.')
-      return
-    }
-
-    if (onDeleteUsuario) {
-      onDeleteUsuario(usuario)
-      return
-    }
-    setLocalUsuarios((prev) => prev.filter((u) => u.id !== usuario.id))
-    toast.success(`Usuario "${usuario.nombre}" eliminado del padrón local.`)
-  }
+  const submitCreate = onCreateUsuario ?? handleCreateUsuario
+  const submitUpdate = onUpdateUsuario ?? handleUpdateUsuario
+  const submitToggle = onToggleActivo ?? handleToggleActivo
+  const submitDelete = onDeleteUsuario ?? handleDeleteUsuario
 
   return (
-    <div className="space-y-5">
-      {/* Encabezado + CTA único primario dorado */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              Administración de Usuarios
-            </h2>
-            <Badge
-              variant="outline"
-              className="gap-1 border-amber-500/30 bg-amber-500/10 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
-            >
-              <ShieldCheck className="h-3 w-3" />
-              Solo ADMIN
-            </Badge>
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Control de cuentas institucionales, división asignada y estado activo en public.perfiles.
-          </p>
-        </div>
-
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            setEditingUsuario(null)
-            setModalOpen(true)
-          }}
-          className="h-9 gap-1.5 self-start bg-primary font-bold text-xs text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90 sm:self-auto"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span>Agregar Usuario</span>
-        </Button>
-      </div>
-
-      {/* Barra de búsqueda, filtros y conteo */}
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm dark:shadow-none lg:mr-24 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-1 flex-col gap-2.5 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, correo o división..."
+              placeholder="Buscar por nombre, correo, división o clave UA..."
               className="h-8 bg-background pl-8 text-xs"
             />
           </div>
@@ -331,8 +260,8 @@ export function UsuariosView({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 font-mono tabular-nums text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 xl:justify-end">
+          <span className="inline-flex items-center gap-1.5 font-mono tabular-nums text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5 text-primary" />
             <span>
               Activos:{' '}
@@ -341,29 +270,35 @@ export function UsuariosView({
               </strong>
             </span>
           </span>
+
+          {isOfflinePreview && (
+            <Badge
+              variant="outline"
+              className="text-[10px] font-medium text-muted-foreground"
+            >
+              Vista previa local
+            </Badge>
+          )}
+
+          <Button
+            type="button"
+            size="sm"
+            disabled={isMutating}
+            onClick={() => {
+              setEditingUsuario(null)
+              setModalOpen(true)
+            }}
+            className="h-9 gap-1.5 bg-primary font-bold text-xs text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>Agregar Usuario</span>
+          </Button>
         </div>
       </div>
 
-      {/* Tabla principal de usuarios */}
       <Card className="border-border bg-card shadow-sm dark:shadow-none">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-base font-bold">
-                Padrón de Usuarios del Sistema
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Visualiza a qué división pertenece cada cuenta, su correo institucional y estado operativo
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
-              {filteredUsuarios.length} usuarios
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <div className="rounded-lg border border-border overflow-hidden">
+        <CardContent className="pt-4">
+          <div className="overflow-hidden rounded-lg border border-border">
             <Table>
               <TableHeader className="bg-secondary/50">
                 <TableRow className="hover:bg-transparent">
@@ -385,7 +320,19 @@ export function UsuariosView({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsuarios.length === 0 ? (
+                {isLoading && !usuariosExternos ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="py-10 text-center text-xs text-muted-foreground"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        Cargando padrón de usuarios...
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsuarios.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -398,12 +345,18 @@ export function UsuariosView({
                   filteredUsuarios.map((usuario) => {
                     const meta = getRolDivisionMeta(usuario.rol)
                     const isSelf = currentUserId === usuario.id
+                    const assignedUnit = usuario.unidad_academica_id
+                      ? unidadesById.get(usuario.unidad_academica_id)
+                      : undefined
+                    const divisionLabel = assignedUnit
+                      ? `${assignedUnit.claveUa} - ${assignedUnit.nombre}`
+                      : meta.division
 
                     return (
                       <TableRow
                         key={usuario.id}
                         className={cn(
-                          'h-12 hover:bg-secondary/30 transition-colors duration-150',
+                          'h-12 transition-colors duration-150 hover:bg-secondary/30',
                           !usuario.activo && 'opacity-65'
                         )}
                       >
@@ -441,7 +394,7 @@ export function UsuariosView({
                               {meta.etiqueta}
                             </Badge>
                             <span className="text-[11px] text-muted-foreground">
-                              {meta.division}
+                              {divisionLabel}
                             </span>
                           </div>
                         </TableCell>
@@ -450,8 +403,10 @@ export function UsuariosView({
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={usuario.activo}
-                              onCheckedChange={() => handleToggleEstado(usuario)}
-                              disabled={isSelf}
+                              onCheckedChange={(checked) =>
+                                void submitToggle(usuario, checked)
+                              }
+                              disabled={isSelf || isMutating}
                               aria-label={`Estado activo de ${usuario.nombre}`}
                             />
                             <Badge
@@ -474,6 +429,7 @@ export function UsuariosView({
                               type="button"
                               variant="ghost"
                               size="icon"
+                              disabled={isMutating}
                               onClick={() => {
                                 setEditingUsuario(usuario)
                                 setModalOpen(true)
@@ -487,7 +443,7 @@ export function UsuariosView({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              disabled={isSelf}
+                              disabled={isSelf || isMutating}
                               onClick={() => setDeletingUsuario(usuario)}
                               aria-label={`Eliminar a ${usuario.nombre}`}
                               className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
@@ -506,25 +462,26 @@ export function UsuariosView({
         </CardContent>
       </Card>
 
-      {/* Modal para Agregar o Editar Usuario */}
       <UsuarioFormModal
         key={`usr-modal-${editingUsuario?.id ?? 'new'}-${String(modalOpen)}`}
         open={modalOpen}
         onOpenChange={setModalOpen}
         initialData={editingUsuario}
+        unidades={unidades}
         activeAdminsCount={activeAdminsCount}
         currentUserId={currentUserId}
-        onSaveCreate={handleCreate}
-        onSaveUpdate={handleUpdate}
+        isSubmitting={isMutating}
+        onSaveCreate={submitCreate}
+        onSaveUpdate={submitUpdate}
       />
 
-      {/* Modal de Confirmación de Eliminación */}
       <ConfirmarEliminarUsuarioModal
         usuario={deletingUsuario}
+        isSubmitting={isMutating}
         onOpenChange={(isOpen) => {
           if (!isOpen) setDeletingUsuario(null)
         }}
-        onConfirm={handleConfirmDelete}
+        onConfirm={submitDelete}
       />
     </div>
   )

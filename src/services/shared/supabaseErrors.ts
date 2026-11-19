@@ -70,6 +70,10 @@ const POSTGRES_ERROR_MAP: Record<
     code: 'SINGLE_ROW_ERROR',
     message: 'No se encontró el registro solicitado o existen múltiples coincidencias.',
   },
+  P0002: {
+    code: 'SINGLE_ROW_ERROR',
+    message: 'No se encontró el registro solicitado en la base de datos.',
+  },
 }
 
 export function mapSupabaseError(error: unknown): AppServiceError {
@@ -107,6 +111,19 @@ export function mapSupabaseError(error: unknown): AppServiceError {
       'EMAIL_NOT_CONFIRMED',
       'El correo electrónico aún no ha sido confirmado. Revisa tu bandeja institucional.',
       { rawCode }
+    )
+  }
+
+  if (
+    rawCode === 'user_already_exists' ||
+    rawCode === 'email_exists' ||
+    lowerMessage.includes('already been registered') ||
+    lowerMessage.includes('already registered')
+  ) {
+    return new AppServiceError(
+      'UNIQUE_VIOLATION',
+      'Ya existe una cuenta registrada con ese correo electrónico.',
+      { rawCode, field: 'email' }
     )
   }
 

@@ -1,4 +1,4 @@
-﻿// Connected to 192.168.1.75 without TLS: the TLS connection failed or was rejected. Set PGSSLMODE=require (or verify-full) to refuse unencrypted connections.
+// Regenerado desde PostgreSQL/Supabase (Issue #10)
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -38,19 +38,69 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"perfiles": {
+                },"fichas_nuevo_ingreso": {
                   Row: {
-                    "activo": boolean,"created_at": string,"email": string,"id": string,"nombre": string,"rol": Database["public"]['Enums']["rol_usuario"],"updated_at": string
+                    "a_materno": string,"a_paterno": string,"celular": string,"correo": string,"created_at": string,"curp": string,"estatus_ficha": Database["public"]['Enums']["estatus_ficha_nuevo_ingreso"],"fecha_nacimiento": string,"fecha_registro": string,"id": string,"nombre": string,"periodo_id": number,"programa_id": number,"sexo": number,"unidad_academica_id": number,"updated_at": string,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "activo"?: boolean,"created_at"?: string,"email": string,"id": string,"nombre": string,"rol"?: Database["public"]['Enums']["rol_usuario"],"updated_at"?: string
+                    "a_materno"?: string,"a_paterno": string,"celular": string,"correo": string,"created_at"?: string,"curp": string,"estatus_ficha"?: Database["public"]['Enums']["estatus_ficha_nuevo_ingreso"],"fecha_nacimiento": string,"fecha_registro"?: string,"id"?: string,"nombre": string,"periodo_id": number,"programa_id": number,"sexo": number,"unidad_academica_id": number,"updated_at"?: string,"usuario_id"?: string
                   }
                   Update: {
-                    "activo"?: boolean,"created_at"?: string,"email"?: string,"id"?: string,"nombre"?: string,"rol"?: Database["public"]['Enums']["rol_usuario"],"updated_at"?: string
+                    "a_materno"?: string,"a_paterno"?: string,"celular"?: string,"correo"?: string,"created_at"?: string,"curp"?: string,"estatus_ficha"?: Database["public"]['Enums']["estatus_ficha_nuevo_ingreso"],"fecha_nacimiento"?: string,"fecha_registro"?: string,"id"?: string,"nombre"?: string,"periodo_id"?: number,"programa_id"?: number,"sexo"?: number,"unidad_academica_id"?: number,"updated_at"?: string,"usuario_id"?: string
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "fichas_nuevo_ingreso_periodo_id_fkey"
+      columns: ["periodo_id"]
+isOneToOne: false
+      referencedRelation: "periodos_escolares"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_nuevo_ingreso_programa_id_fkey"
+      columns: ["programa_id"]
+isOneToOne: false
+      referencedRelation: "programas_educativos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_nuevo_ingreso_unidad_academica_id_fkey"
+      columns: ["unidad_academica_id"]
+isOneToOne: false
+      referencedRelation: "unidades_academicas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fichas_nuevo_ingreso_usuario_id_fkey"
+      columns: ["usuario_id"]
+isOneToOne: false
+      referencedRelation: "perfiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fk_fichas_unidad_programa"
+      columns: ["unidad_academica_id","programa_id"]
+isOneToOne: false
+      referencedRelation: "programas_educativos"
+      referencedColumns: ["unidad_academica_id","id"]
+    }
+                  ]
+                },"perfiles": {
+                  Row: {
+                    "activo": boolean,"created_at": string,"email": string,"id": string,"nombre": string,"rol": Database["public"]['Enums']["rol_usuario"],"unidad_academica_id": number | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "activo"?: boolean,"created_at"?: string,"email": string,"id": string,"nombre": string,"rol"?: Database["public"]['Enums']["rol_usuario"],"unidad_academica_id"?: number | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "activo"?: boolean,"created_at"?: string,"email"?: string,"id"?: string,"nombre"?: string,"rol"?: Database["public"]['Enums']["rol_usuario"],"unidad_academica_id"?: number | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "perfiles_unidad_academica_id_fkey"
+      columns: ["unidad_academica_id"]
+isOneToOne: false
+      referencedRelation: "unidades_academicas"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"periodos_escolares": {
                   Row: {
@@ -138,6 +188,44 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"tramites_alumnos": {
+                  Row: {
+                    "archivo_pdf_url": string | null,"created_at": string,"estado": Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro": string,"folio": number,"id": string,"nombre_alumno": string,"numero_cuenta": string,"observaciones": string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at": string,"usuario_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: never,"id"?: string,"nombre_alumno": string,"numero_cuenta": string,"observaciones"?: string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at"?: string,"usuario_id"?: string
+                  }
+                  Update: {
+                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: never,"id"?: string,"nombre_alumno"?: string,"numero_cuenta"?: string,"observaciones"?: string | null,"periodo_id"?: number,"programa_id"?: number,"tipo_tramite_id"?: number,"updated_at"?: string,"usuario_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tramites_alumnos_periodo_id_fkey"
+      columns: ["periodo_id"]
+isOneToOne: false
+      referencedRelation: "periodos_escolares"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tramites_alumnos_programa_id_fkey"
+      columns: ["programa_id"]
+isOneToOne: false
+      referencedRelation: "programas_educativos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tramites_alumnos_tipo_tramite_id_fkey"
+      columns: ["tipo_tramite_id"]
+isOneToOne: false
+      referencedRelation: "tipos_tramite"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tramites_alumnos_usuario_id_fkey"
+      columns: ["usuario_id"]
+isOneToOne: false
+      referencedRelation: "perfiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"unidades_academicas": {
                   Row: {
                     "activa": boolean,"clave_ua": string,"created_at": string,"id": number,"nivel": Database["public"]['Enums']["nivel_educativo"],"nombre": string
@@ -158,12 +246,35 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "current_user_role":
+            "admin_delete_usuario":
+{ Args: { "p_user_id": string }; Returns: undefined
+                           },
+"admin_update_usuario":
+{ Args: { "p_activo": boolean,"p_email": string,"p_nombre": string,"p_rol": Database["public"]['Enums']["rol_usuario"],"p_unidad_academica_id"?: number,"p_user_id": string }; Returns: {
+              "activo": boolean,
+"created_at": string,
+"email": string,
+"id": string,
+"nombre": string,
+"rol": Database["public"]['Enums']["rol_usuario"],
+"unidad_academica_id": number | null,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "perfiles"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"current_user_role":
 { Args: Record<PropertyKey, never>; Returns: Database["public"]['Enums']["rol_usuario"]
+                           },
+"current_user_unidad_academica_id":
+{ Args: Record<PropertyKey, never>; Returns: number
                            }
           }
           Enums: {
-            "estado_acta": "PENDIENTE"|"GENERADA"|"NO_APLICA","modulo_tramite": "TRAMITES_GENERALES"|"NUEVO_INGRESO","nivel_educativo": "LICENCIATURA"|"BACHILLERATO","rol_usuario": "ADMIN"|"LICENCIATURA"|"BACHILLERATO"|"NUEVO_INGRESO","tipo_acta": "ORDINARIA"|"EXTRAORDINARIA"|"REGULARIZACION"
+            "estado_acta": "PENDIENTE"|"GENERADA"|"NO_APLICA","estado_tramite_alumno": "PENDIENTE"|"RESUELTO"|"CON_ERROR","estatus_ficha_nuevo_ingreso": "SIN_PROCESO"|"SIN_PAGO"|"FICHA_VENCIDA"|"FICHA_CANCELADA","modulo_tramite": "TRAMITES_GENERALES"|"NUEVO_INGRESO","nivel_educativo": "LICENCIATURA"|"BACHILLERATO","rol_usuario": "ADMIN"|"LICENCIATURA"|"BACHILLERATO"|"NUEVO_INGRESO"|"UNIDAD_ACADEMICA","tipo_acta": "ORDINARIA"|"EXTRAORDINARIA"|"REGULARIZACION"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -279,7 +390,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "estado_acta": ["PENDIENTE", "GENERADA", "NO_APLICA"],"modulo_tramite": ["TRAMITES_GENERALES", "NUEVO_INGRESO"],"nivel_educativo": ["LICENCIATURA", "BACHILLERATO"],"rol_usuario": ["ADMIN", "LICENCIATURA", "BACHILLERATO", "NUEVO_INGRESO"],"tipo_acta": ["ORDINARIA", "EXTRAORDINARIA", "REGULARIZACION"]
+            "estado_acta": ["PENDIENTE", "GENERADA", "NO_APLICA"],"estado_tramite_alumno": ["PENDIENTE", "RESUELTO", "CON_ERROR"],"estatus_ficha_nuevo_ingreso": ["SIN_PROCESO", "SIN_PAGO", "FICHA_VENCIDA", "FICHA_CANCELADA"],"modulo_tramite": ["TRAMITES_GENERALES", "NUEVO_INGRESO"],"nivel_educativo": ["LICENCIATURA", "BACHILLERATO"],"rol_usuario": ["ADMIN", "LICENCIATURA", "BACHILLERATO", "NUEVO_INGRESO", "UNIDAD_ACADEMICA"],"tipo_acta": ["ORDINARIA", "EXTRAORDINARIA", "REGULARIZACION"]
           }
         }
 } as const

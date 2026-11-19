@@ -1,7 +1,7 @@
 ---
 tipo: memoria_ai
 proyecto: "SistemaSeguimientoDeTramites"
-actualizado: 2026-11-17
+actualizado: 2026-11-18
 tags:
   - context-ai
   - memory
@@ -31,9 +31,28 @@ tags:
 * **Servicio y Módulo de Catálogos (Issue #8):** Implementado `src/services/catalogos/` (`catalogos.service.ts`, `catalogosValidation.ts`, `index.ts`) con lectura global (`fetchAllCatalogos`) y CRUD completo (agregar, editar, activar/desactivar, eliminar) para `unidades_academicas`, `programas_educativos`, `tipos_tramite` y `periodos_escolares`. Integrado en `src/features/catalogos/hooks/useCatalogos.ts`, `CatalogosView.tsx` (incluyendo pestaña de Periodos Escolares) y `CatalogosModals.tsx` (`PeriodoFormModal`).
 
 **Dónde nos quedamos (Pendiente inmediato):**
-1. **Completar Issue #1 (Protección de rutas por rol):** Los servicios base de autenticación y `useAuth` ya están conectados para Issue #6; falta restringir vistas/módulos según `rol_usuario` (`ADMIN`, `LICENCIATURA`, `BACHILLERATO`, `NUEVO_INGRESO`) y retirar el botón temporal de bypass en producción.
-2. **Módulos funcionales:** Tablero de 8 trámites generales, módulo transversal de Fichas de Nuevo Ingreso, checklist semestral de Actas, métricas/catálogos y exportación `.xlsx` con ExcelJS.
+1. **Actualizar esquema y módulos al nuevo requerimiento (2026-11-18):** Migrar Trámites de lote numérico a captura por alumno con folio consecutivo, implementar Fichas de Nuevo Ingreso con los 10 campos del Excel oficial y exportación `.xlsx`, adaptar `ChecklistActasView` a formato **tabla con checkboxes para las 3 actas** (`ORDINARIA`, `EXTRAORDINARIA`, `REGULARIZACION`) tomando `Checklist.jpeg` como referencia visual, y añadir soporte RLS para usuario restringido a una sola unidad académica (ej. clave `4800`).
+2. **Completar Issue #1 (Protección de rutas por rol):** Los servicios base de autenticación y `useAuth` ya están conectados para Issue #6; falta restringir vistas/módulos según `rol_usuario` (`ADMIN`, `LICENCIATURA`, `BACHILLERATO`, `NUEVO_INGRESO`, más el alcance por `unidad_academica_id`) y retirar el botón temporal de bypass en producción.
 3. **Pendientes menores de setup:** Agregar iconos PWA (`pwa-192x192.png`, `pwa-512x512.png` referenciados en `vite.config.ts`) y cambiar `require("tailwindcss-animate")` a `import` ESM en `tailwind.config.js` (línea 104) si genera aviso en editor/Node.
+
+---
+
+## Cambio de Requerimientos (Actualización 2026-11-18)
+
+> **ADVERTENCIA SOBRE ARCHIVOS DE REFERENCIA:** Los audios, la imagen y el Excel de estos requerimientos (`AudioDeFormulario.ogg`, `DataDeTramites.ogg`, `DataRequerimientos.ogg`, `DataDeFichaDeNuevoIngreso.ogg`, `DataFormatoYReporte.ogg`, `DataNuevoIngresoYtodo.ogg`, `FeatureUsuariosSoloInformatica.ogg`, `RequerimientoChecklist.ogg`, `Checklist.jpeg` y `CLAVE UA - NUEVO INGRESO 2026.xlsx`) **están en la nube / recurso compartido SMB (`smb://192.168.1.73/personal/AppTramites/InfoDeRequerimientos`) y NO están dentro de ninguna carpeta local del repositorio.** *(Nota: `DataDeTramites.ogg` y `DataRequerimientos.ogg` son el mismo audio.)*
+
+1. **Trámites Generales (8 trámites -> formulario por alumno + folio consecutivo):**
+   * Reemplaza la captura puramente numérica por lote. Ahora se registra cada solicitud en formato formulario tipo Excel: `numero_cuenta`, `nombre_alumno`, `carrera`/`programa_id`, `fecha_registro`, estado (`PENDIENTE`/`RESUELTO`) y **número de folio consecutivo** autogenerado al enviar.
+   * Aplica a todo nivel **Licenciatura** (Iris) y **Bachillerato** (Juan Carlos), conservando métricas mensuales (ej. agosto, septiembre) y desglose general en el Dashboard.
+2. **Fichas de Nuevo Ingreso (transversal -> formulario por aspirante + exportación `.xlsx`):**
+   * Operado exclusivamente por `NUEVO_INGRESO` (Ismael) cubriendo Bachillerato y Licenciatura desglosados por escuela/unidad académica.
+   * Campos exactos según `CLAVE UA - NUEVO INGRESO 2026.xlsx` (respetar encabezados sin modificarlos): `CURP`, `A_Paterno`, `A_Materno`, `NOMBRE`, `SEXO` (`1` = Masculino, `2` = Femenino), `ESCUELA` (clave UA de 4 dígitos), `CARRERA` (clave de 1 a 2 dígitos), `FECHA NAC` (`AAAA/MM/DD`), `CELULAR`, `CORREO`.
+   * Exportación a Excel con ese formato exacto (casos sin proceso / sin pago / ficha vencida / ficha cancelada).
+3. **Checklist de Actas (3 actas en tabla con checkboxes):**
+   * Se mantiene exclusivamente para las **3 actas oficiales** (`ORDINARIA`, `EXTRAORDINARIA`, `REGULARIZACION`).
+   * La imagen `Checklist.jpeg` es referencia de diseño para **visualizarlo en forma de tabla con checkboxes** (por clave de escuela/programa y las 3 actas en columnas, limpiando o filtrando pendientes conforme se marcan), en lugar de solo tarjetas/listas desplegables.
+4. **Nuevo usuario acotado por Unidad Académica:**
+   * Se requiere dar de alta un rol/alcance por escuela específica (ejemplo: usuario para Informática clave `4800`) con acceso a todos los trámites pero filtrado exclusivamente a su `unidad_academica_id` vía políticas RLS en PostgreSQL.
 
 ---
 
@@ -49,9 +68,9 @@ tags:
 
 ## Trampas Críticas a Evitar (Anti-patrones del Proyecto)
 
-* **Trampa 1: Intentar capturar alumno por alumno.**
-  * *Error:* Pedir CURP, matrícula o nombres de estudiantes.
-  * *Regla:* La captura es 100% numérica por lote (`enviadas`, `resueltas`, `pendientes`, `con_error`).
+* **Trampa 1: Mantener la regla obsoleta de captura solo numérica por lote.**
+  * *Error:* Rechazar `numero_cuenta`, `nombre_alumno`, `CURP` o campos por alumno basándose en la especificación inicial previa al 2026-11-18.
+  * *Regla:* Desde la actualización del 2026-11-18, Trámites captura por alumno con folio consecutivo automático y Fichas captura los 10 campos nominales del Excel oficial; las métricas del Dashboard se derivan/agregan desde esos registros.
 * **Trampa 2: Filtrar por nivel escolar a Ismael (Nuevo Ingreso).**
   * *Error:* Ocultarle las prepas o las facultades al rol `NUEVO_INGRESO`.
   * *Regla:* Ismael es transversal: ve Bachillerato y Licenciatura juntas, pero únicamente para el módulo de Fichas.

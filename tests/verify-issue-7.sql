@@ -35,7 +35,7 @@ DECLARE
   v_tramite_id bigint;
   v_periodo_id bigint;
   v_id uuid;
-  v_folio bigint;
+  v_folio text;
   v_estado public.estado_tramite_alumno;
 BEGIN
   SELECT public.current_user_unidad_academica_id() INTO v_ua_info;
@@ -43,8 +43,8 @@ BEGIN
   SELECT id INTO v_tramite_id FROM public.tipos_tramite WHERE modulo = 'TRAMITES_GENERALES' LIMIT 1;
   SELECT id INTO v_periodo_id FROM public.periodos_escolares ORDER BY activo DESC, id ASC LIMIT 1;
 
-  INSERT INTO public.tramites_alumnos (numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id, fecha_registro, estado)
-  VALUES ('20267001', 'ALUMNO PRUEBA SIETE', v_prog_info, v_tramite_id, v_periodo_id, '2026-11-19', 'PENDIENTE')
+  INSERT INTO public.tramites_alumnos (folio, numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id, fecha_registro, estado)
+  VALUES ('sim7-001', '20267001', 'ALUMNO PRUEBA SIETE', v_prog_info, v_tramite_id, v_periodo_id, '2026-11-19', 'PENDIENTE')
   RETURNING id, folio INTO v_id, v_folio;
 
   UPDATE public.tramites_alumnos
@@ -52,10 +52,20 @@ BEGIN
   WHERE id = v_id
   RETURNING estado INTO v_estado;
 
-  IF v_folio IS NULL OR v_estado <> 'RESUELTO' THEN
+  IF v_folio <> 'SIM7-001' OR v_estado <> 'RESUELTO' THEN
     RAISE EXCEPTION 'Fallo alta o actualizacion en tramites_alumnos';
   END IF;
   RAISE NOTICE '[OK] Diana registro y actualizo tramite folio % a RESUELTO', v_folio;
+
+  -- Caso negativo UNIQUE: folio duplicado en mismo tramite y periodo (23505)
+  BEGIN
+    INSERT INTO public.tramites_alumnos (folio, numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id)
+    VALUES ('SIM7-001', '20267004', 'ALUMNO FOLIO DUPLICADO', v_prog_info, v_tramite_id, v_periodo_id);
+    RAISE EXCEPTION 'Debio fallar uq_tramites_alumnos_periodo_tipo_folio (23505)';
+  EXCEPTION
+    WHEN unique_violation THEN
+      RAISE NOTICE '[OK] Rechazo 23505 verificado para folio duplicado en mismo tramite/periodo';
+  END;
 
   -- Caso negativo CHECK: nombre_alumno en blanco (23514)
   BEGIN

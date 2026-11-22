@@ -24,6 +24,8 @@ import {
   deleteTramiteAlumno,
   fetchCatalogosParaTramites,
   fetchTramitesAlumnos,
+  formatFolioBadge,
+  normalizeFolio,
   updateEstadoTramiteAlumno,
   updateTramiteAlumno,
   type EstadoTramiteAlumno,
@@ -170,6 +172,23 @@ export function useTramites() {
       }
 
       if (isOfflinePreview) {
+        const normalizedFolio = normalizeFolio(effectiveInput.folio)
+        if (normalizedFolio !== null) {
+          const duplicate = tramites.some(
+            (row) =>
+              row.id !== editId &&
+              row.periodoId === effectiveInput.periodoId &&
+              row.tipoTramiteId === effectiveInput.tipoTramiteId &&
+              row.folio === normalizedFolio
+          )
+          if (duplicate) {
+            toast.error(
+              'Ese folio ya está registrado para este trámite y periodo escolar.'
+            )
+            return false
+          }
+        }
+
         const prog = programas.find((p) => p.id === effectiveInput.programaId)
         const ua = unidades.find((u) => u.id === prog?.unidadAcademicaId)
         const tipo = tiposTramite.find((t) => t.id === effectiveInput.tipoTramiteId)
@@ -181,6 +200,7 @@ export function useTramites() {
                 ? {
                     ...row,
                     ...effectiveInput,
+                    folio: normalizedFolio,
                     clavePrograma: prog?.clavePrograma ?? row.clavePrograma,
                     nombrePrograma: prog?.nombre ?? row.nombrePrograma,
                     unidadAcademicaId: ua?.id ?? row.unidadAcademicaId,
@@ -199,11 +219,9 @@ export function useTramites() {
           return true
         }
 
-        const nextFolio =
-          tramites.reduce((max, r) => Math.max(max, r.folio), 100) + 1
         const createdMock: TramiteAlumnoRecord = {
           id: `tr-${Date.now()}`,
-          folio: nextFolio,
+          folio: normalizedFolio,
           numeroCuenta: effectiveInput.numeroCuenta.trim(),
           nombreAlumno: effectiveInput.nombreAlumno.trim().toUpperCase(),
           programaId: effectiveInput.programaId,
@@ -225,7 +243,9 @@ export function useTramites() {
         }
         setTramites((prev) => [createdMock, ...prev])
         toast.success(
-          `Trámite registrado con folio #${createdMock.folio} (vista previa local).`
+          createdMock.folio
+            ? `Trámite registrado con folio ${createdMock.folio} (vista previa local).`
+            : 'Trámite registrado sin folio (vista previa local).'
         )
         return true
       }
@@ -236,14 +256,16 @@ export function useTramites() {
           setTramites((prev) =>
             prev.map((row) => (row.id === updated.id ? updated : row))
           )
-          return `Trámite folio #${updated.folio} actualizado.`
+          return `Trámite (${formatFolioBadge(updated.folio)}) actualizado.`
         })
       }
 
       return runMutation(async () => {
         const created = await createTramiteAlumno(effectiveInput)
         setTramites((prev) => [created, ...prev])
-        return `Trámite registrado con folio #${created.folio}.`
+        return created.folio
+          ? `Trámite registrado con folio ${created.folio}.`
+          : 'Trámite registrado correctamente.'
       })
     },
     [
@@ -272,7 +294,9 @@ export function useTramites() {
             row.id === tramite.id ? { ...row, estado: nextEstado } : row
           )
         )
-        toast.info(`Folio #${tramite.folio} marcado como ${nextEstado}.`)
+        toast.info(
+          `Trámite (${formatFolioBadge(tramite.folio)}) marcado como ${nextEstado}.`
+        )
         return true
       }
 
@@ -281,7 +305,7 @@ export function useTramites() {
         setTramites((prev) =>
           prev.map((row) => (row.id === updated.id ? updated : row))
         )
-        return `Folio #${updated.folio} actualizado a ${updated.estado}.`
+        return `Trámite (${formatFolioBadge(updated.folio)}) actualizado a ${updated.estado}.`
       })
     },
     [isOfflinePreview, runMutation]
@@ -291,14 +315,16 @@ export function useTramites() {
     async (tramite: TramiteAlumnoRecord): Promise<boolean> => {
       if (isOfflinePreview) {
         setTramites((prev) => prev.filter((row) => row.id !== tramite.id))
-        toast.success(`Trámite folio #${tramite.folio} eliminado de la vista previa.`)
+        toast.success(
+          `Trámite (${formatFolioBadge(tramite.folio)}) eliminado de la vista previa.`
+        )
         return true
       }
 
       return runMutation(async () => {
         await deleteTramiteAlumno(tramite.id)
         setTramites((prev) => prev.filter((row) => row.id !== tramite.id))
-        return `Trámite folio #${tramite.folio} eliminado.`
+        return `Trámite (${formatFolioBadge(tramite.folio)}) eliminado.`
       })
     },
     [isOfflinePreview, runMutation]

@@ -93,6 +93,12 @@ describe('supabaseErrors - mapeo de errores Auth y PostgreSQL', () => {
   it('mapea codigos Postgres y PostgREST esperados', () => {
     assert.equal(mapSupabaseError({ code: '23514' }).code, 'CHECK_VIOLATION')
     assert.equal(mapSupabaseError({ code: '23505' }).code, 'UNIQUE_VIOLATION')
+    const dupFolio = mapSupabaseError({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "uq_tramites_alumnos_periodo_tipo_folio"',
+    })
+    assert.equal(dupFolio.code, 'UNIQUE_VIOLATION')
+    assert.equal(dupFolio.field, 'folio')
     assert.equal(
       mapSupabaseError({ code: '23503' }).code,
       'FOREIGN_KEY_VIOLATION'

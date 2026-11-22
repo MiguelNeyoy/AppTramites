@@ -70,7 +70,7 @@ export async function fetchTramitesAlumnos(
     .from('tramites_alumnos')
     .select(TRAMITES_SELECT)
     .order('fecha_registro', { ascending: false })
-    .order('folio', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (options?.periodoId !== undefined) {
     query = query.eq('periodo_id', options.periodoId)
@@ -116,7 +116,8 @@ export async function fetchCatalogosParaTramites(): Promise<TramitesCatalogosSna
 }
 
 /**
- * Registra un tramite por alumno en public.tramites_alumnos; Postgres genera el folio consecutivo.
+ * Registra un tramite por alumno en public.tramites_alumnos con folio manual opcional
+ * (unico por periodo y tipo de tramite cuando se especifica).
  */
 export async function createTramiteAlumno(
   input: TramiteAlumnoInput
@@ -132,6 +133,7 @@ export async function createTramiteAlumno(
   const { data, error } = await supabase
     .from('tramites_alumnos')
     .insert({
+      folio: d.folio ?? null,
       numero_cuenta: d.numeroCuenta,
       nombre_alumno: d.nombreAlumno,
       programa_id: d.programaId,
@@ -177,6 +179,7 @@ export async function updateTramiteAlumno(
   const { data, error } = await supabase
     .from('tramites_alumnos')
     .update({
+      folio: d.folio ?? null,
       numero_cuenta: d.numeroCuenta,
       nombre_alumno: d.nombreAlumno,
       programa_id: d.programaId,

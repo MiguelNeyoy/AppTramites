@@ -1,6 +1,5 @@
-import { FileText, Hash, Upload } from 'lucide-react'
+import { FileText, Upload } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -16,6 +15,7 @@ import type { Enums } from '@/types/database.types'
 export type EstadoTramiteAlumno = Enums<'estado_tramite_alumno'>
 
 export interface GeneralTramiteDraft {
+  folio: string
   numeroCuenta: string
   nombreAlumno: string
   fechaRegistro: string
@@ -27,7 +27,6 @@ export interface GeneralTramiteDraft {
 interface GeneralTramiteFieldsProps {
   draft: GeneralTramiteDraft
   permitePdf: boolean
-  folioPreview?: number
   onChange: (patch: Partial<GeneralTramiteDraft>) => void
 }
 
@@ -40,7 +39,6 @@ const ESTADO_TRAMITE_OPTIONS: { value: EstadoTramiteAlumno; label: string }[] = 
 export function GeneralTramiteFields({
   draft,
   permitePdf,
-  folioPreview,
   onChange,
 }: GeneralTramiteFieldsProps) {
   return (
@@ -52,13 +50,6 @@ export function GeneralTramiteFields({
             2. Datos del Alumno y Seguimiento
           </h3>
         </div>
-        <Badge
-          variant="outline"
-          className="gap-1 font-mono tabular-nums text-[10px] text-muted-foreground"
-        >
-          <Hash className="h-3 w-3 text-primary" />
-          Folio consecutivo automatico
-        </Badge>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
@@ -98,20 +89,18 @@ export function GeneralTramiteFields({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label
-            htmlFor="tramite-folio-preview"
+            htmlFor="tramite-folio"
             className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
           >
-            Folio Consecutivo
+            Folio (Opcional / Único)
           </Label>
           <Input
-            id="tramite-folio-preview"
-            readOnly
-            value={
-              folioPreview !== undefined
-                ? `#${String(folioPreview).padStart(4, '0')}`
-                : 'Autogenerado al guardar'
-            }
-            className="h-9 bg-secondary/40 font-mono tabular-nums text-xs text-muted-foreground"
+            id="tramite-folio"
+            placeholder="Ej. 0045 o URS-01"
+            maxLength={40}
+            value={draft.folio}
+            onChange={(e) => onChange({ folio: e.target.value })}
+            className="h-9 bg-background font-mono tabular-nums text-xs uppercase"
           />
         </div>
 

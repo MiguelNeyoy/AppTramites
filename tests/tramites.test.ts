@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  formatFolioBadge,
   mapTramiteFromDb,
+  normalizeFolio,
   summarizeTramitesByEstado,
   validateTramiteAlumnoInput,
   type TramiteJoinedDbRow,
@@ -11,6 +13,7 @@ import {
 describe('tramitesValidation - validacion y mapeo de tramites por alumno', () => {
   it('valida y normaliza campos de un tramite individual por alumno', () => {
     const res = validateTramiteAlumnoInput({
+      folio: '  urs-2026-01 ',
       numeroCuenta: ' 20261234 ',
       nombreAlumno: '  Juan Perez Lopez ',
       programaId: 1,
@@ -24,15 +27,21 @@ describe('tramitesValidation - validacion y mapeo de tramites por alumno', () =>
 
     assert.equal(res.valid, true)
     if (res.valid) {
+      assert.equal(res.data.folio, 'URS-2026-01')
       assert.equal(res.data.numeroCuenta, '20261234')
       assert.equal(res.data.nombreAlumno, 'JUAN PEREZ LOPEZ')
       assert.equal(res.data.observaciones, 'Entrega pendiente')
       assert.equal(res.data.archivoPdfUrl, null)
     }
+
+    assert.equal(normalizeFolio('   '), null)
+    assert.equal(formatFolioBadge(null), 'Sin folio')
+    assert.equal(formatFolioBadge('0042'), '0042')
   })
 
-  it('rechaza numeroCuenta vacio, patrones SQLi y fecha invalida', () => {
+  it('rechaza folio con espacios o SQLi, numeroCuenta vacio y fecha invalida', () => {
     const base = {
+      folio: '0042',
       numeroCuenta: '20261234',
       nombreAlumno: 'JUAN PEREZ',
       programaId: 1,
@@ -42,6 +51,12 @@ describe('tramitesValidation - validacion y mapeo de tramites por alumno', () =>
       estado: 'PENDIENTE' as const,
     }
 
+    assert.equal(validateTramiteAlumnoInput({ ...base, folio: '' }).valid, true)
+    assert.equal(validateTramiteAlumnoInput({ ...base, folio: 'URS 01' }).valid, false)
+    assert.equal(
+      validateTramiteAlumnoInput({ ...base, folio: "001'; DROP TABLE--" }).valid,
+      false
+    )
     assert.equal(validateTramiteAlumnoInput({ ...base, numeroCuenta: '   ' }).valid, false)
     assert.equal(
       validateTramiteAlumnoInput({
@@ -66,7 +81,7 @@ describe('tramitesValidation - validacion y mapeo de tramites por alumno', () =>
   it('mapea filas unidas de Postgres y resume conteos por estado', () => {
     const row: TramiteJoinedDbRow = {
       id: 'tr-uuid-1',
-      folio: 42,
+      folio: '0042',
       numero_cuenta: '20224819',
       nombre_alumno: 'DANIELA SANCHEZ',
       programa_id: 1,
@@ -100,7 +115,7 @@ describe('tramitesValidation - validacion y mapeo de tramites por alumno', () =>
     }
 
     const mapped = mapTramiteFromDb(row)
-    assert.equal(mapped.folio, 42)
+    assert.equal(mapped.folio, '0042')
     assert.equal(mapped.claveUa, '4800')
     assert.equal(mapped.permitePdf, true)
 

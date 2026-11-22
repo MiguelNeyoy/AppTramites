@@ -10,7 +10,9 @@ export {
 } from './tramites.service'
 
 export {
+  formatFolioBadge,
   mapTramiteFromDb,
+  normalizeFolio,
   summarizeTramitesByEstado,
   validateTramiteAlumnoInput,
   type EstadoTramiteAlumno,

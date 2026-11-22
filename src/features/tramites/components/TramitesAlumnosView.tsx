@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils'
 import type { NivelFilter } from '@/features/dashboard/types'
 import type { RolUsuario } from '@/services/login'
 import {
+  formatFolioBadge,
   summarizeTramitesByEstado,
   type EstadoTramiteAlumno,
   type TramiteAlumnoRecord,
@@ -155,7 +156,7 @@ export function TramitesAlumnosView({
         estadoFilter === 'TODOS' || row.estado === estadoFilter
       const matchesQuery =
         !q ||
-        String(row.folio).includes(q) ||
+        (row.folio ?? '').toLowerCase().includes(q) ||
         row.numeroCuenta.toLowerCase().includes(q) ||
         row.nombreAlumno.toLowerCase().includes(q) ||
         row.claveUa.toLowerCase().includes(q) ||
@@ -204,9 +205,9 @@ export function TramitesAlumnosView({
                 <SelectItem
                   key={p.id}
                   value={String(p.id)}
-                  className="font-mono text-xs"
+                  className="font-mono tabular-nums text-xs"
                 >
-                  {p.nombre}
+                  Periodo {p.numeroPeriodo}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -474,9 +475,14 @@ export function TramitesAlumnosView({
                         <TableCell className="py-2">
                           <Badge
                             variant="outline"
-                            className="border-amber-500/30 bg-amber-500/10 font-mono tabular-nums text-[10px] font-bold text-amber-600 dark:text-amber-400"
+                            className={cn(
+                              'font-mono tabular-nums text-[10px] font-bold',
+                              row.folio
+                                ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'border-border bg-secondary/40 text-muted-foreground'
+                            )}
                           >
-                            #{String(row.folio).padStart(4, '0')}
+                            {formatFolioBadge(row.folio)}
                           </Badge>
                         </TableCell>
 
@@ -539,7 +545,7 @@ export function TramitesAlumnosView({
                             }
                           >
                             <SelectTrigger
-                              aria-label={`Estado de folio ${row.folio}`}
+                              aria-label={`Estado de ${formatFolioBadge(row.folio)}`}
                               className={cn(
                                 'h-7 w-[112px] rounded-full px-2.5 text-[10px] font-bold',
                                 estadoMeta.badgeClass
@@ -572,7 +578,7 @@ export function TramitesAlumnosView({
                                 setEditingTramite(row)
                                 setModalOpen(true)
                               }}
-                              aria-label={`Editar folio ${row.folio}`}
+                              aria-label={`Editar ${formatFolioBadge(row.folio)}`}
                               className="h-7 w-7 text-muted-foreground hover:bg-secondary hover:text-foreground"
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -584,7 +590,7 @@ export function TramitesAlumnosView({
                                 size="icon"
                                 disabled={isMutating}
                                 onClick={() => setDeletingTramite(row)}
-                                aria-label={`Eliminar folio ${row.folio}`}
+                                aria-label={`Eliminar ${formatFolioBadge(row.folio)}`}
                                 className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -641,9 +647,9 @@ export function TramitesAlumnosView({
             </div>
           </DialogHeader>
           <div className="px-5 py-4 text-xs text-foreground">
-            ¿Confirmas eliminar el trámite folio{' '}
+            ¿Confirmas eliminar el trámite{' '}
             <strong className="font-mono">
-              #{String(deletingTramite?.folio ?? '').padStart(4, '0')}
+              {formatFolioBadge(deletingTramite?.folio ?? null)}
             </strong>{' '}
             de <strong>{deletingTramite?.nombreAlumno}</strong>?
           </div>

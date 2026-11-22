@@ -91,11 +91,13 @@ async function runIssueSimulation() {
   assert.ok(programas?.length && tipos?.length && periodos?.length)
 
   const suffix = String(Date.now()).slice(-6)
+  const manualFolio = `SIM-${suffix}`
 
-  // Happy path: insertar tramite por alumno y verificar folio consecutivo + estado
+  // Happy path: insertar tramite por alumno con folio manual y verificar normalizacion + estado
   const { data: created, error: createErr } = await supabase
     .from('tramites_alumnos')
     .insert({
+      folio: ` ${manualFolio.toLowerCase()} `,
       numero_cuenta: `2026${suffix}`,
       nombre_alumno: `ALUMNO SIM ${suffix}`,
       programa_id: programas[0].id,
@@ -114,9 +116,45 @@ async function runIssueSimulation() {
   )
 
   const mapped = mapTramiteFromDb(created)
-  assert.ok(mapped.folio > 0)
+  assert.equal(mapped.folio, manualFolio)
   assert.equal(mapped.estado, 'PENDIENTE')
-  console.log(`[OK] Tramite creado con folio=#${mapped.folio} (${mapped.nombreTramite})`)
+  console.log(`[OK] Tramite creado con folio=${mapped.folio} (${mapped.nombreTramite})`)
+
+  // Negativo UNIQUE (23505): folio duplicado en mismo tramite y periodo
+  const { error: dupFolioErr } = await supabase.from('tramites_alumnos').insert({
+    folio: manualFolio.toLowerCase(),
+    numero_cuenta: `2026${suffix}B`,
+    nombre_alumno: `ALUMNO DUP ${suffix}`,
+    programa_id: programas[0].id,
+    tipo_tramite_id: tipos[0].id,
+    periodo_id: periodos[0].id,
+    fecha_registro: new Date().toISOString().slice(0, 10),
+    estado: 'PENDIENTE',
+  })
+  assert.equal(dupFolioErr?.code, '23505', 'Postgres debio rechazar folio duplicado con 23505')
+  console.log('[OK] Rechazo 23505 por folio duplicado verificado')
+
+  // Happy path sin folio (NULL opcional)
+  const { data: sinFolio, error: sinFolioErr } = await supabase
+    .from('tramites_alumnos')
+    .insert({
+      folio: null,
+      numero_cuenta: `2026${suffix}C`,
+      nombre_alumno: `ALUMNO SIN FOLIO ${suffix}`,
+      programa_id: programas[0].id,
+      tipo_tramite_id: tipos[0].id,
+      periodo_id: periodos[0].id,
+      fecha_registro: new Date().toISOString().slice(0, 10),
+      estado: 'PENDIENTE',
+    })
+    .select('id, folio')
+    .single()
+  assert.ifError(sinFolioErr)
+  assert.equal(sinFolio.folio, null)
+  cleanupTasks.push(() =>
+    supabase.from('tramites_alumnos').delete().eq('id', sinFolio.id)
+  )
+  console.log('[OK] Alta opcional con folio NULL verificada')
 
   // Actualizar estado a RESUELTO (accion directa en tabla de TramitesAlumnosView)
   const { data: updated, error: updateErr } = await supabase

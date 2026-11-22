@@ -93,8 +93,8 @@ DECLARE
   v_prog_derecho bigint;
   v_tramite_id bigint;
   v_periodo_id bigint;
-  v_folio_1 bigint;
-  v_folio_2 bigint;
+  v_folio_1 text;
+  v_folio_2 text;
 BEGIN
   SELECT public.current_user_role() INTO v_rol;
   SELECT public.current_user_unidad_academica_id() INTO v_ua_id;
@@ -119,18 +119,18 @@ BEGIN
   SELECT id INTO v_tramite_id FROM public.tipos_tramite WHERE modulo = 'TRAMITES_GENERALES' LIMIT 1;
   SELECT id INTO v_periodo_id FROM public.periodos_escolares ORDER BY activo DESC, id ASC LIMIT 1;
 
-  INSERT INTO public.tramites_alumnos (numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id)
-  VALUES ('20260001', 'Alumno Informatica Uno', v_prog_info, v_tramite_id, v_periodo_id)
+  INSERT INTO public.tramites_alumnos (folio, numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id)
+  VALUES ('4800-001', '20260001', 'Alumno Informatica Uno', v_prog_info, v_tramite_id, v_periodo_id)
   RETURNING folio INTO v_folio_1;
 
-  INSERT INTO public.tramites_alumnos (numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id)
-  VALUES ('20260002', 'Alumno Informatica Dos', v_prog_info, v_tramite_id, v_periodo_id)
+  INSERT INTO public.tramites_alumnos (folio, numero_cuenta, nombre_alumno, programa_id, tipo_tramite_id, periodo_id)
+  VALUES ('4800-002', '20260002', 'Alumno Informatica Dos', v_prog_info, v_tramite_id, v_periodo_id)
   RETURNING folio INTO v_folio_2;
 
-  IF v_folio_2 <= v_folio_1 THEN
-    RAISE EXCEPTION 'El folio debe ser consecutivo creciente: % -> %', v_folio_1, v_folio_2;
+  IF v_folio_1 <> '4800-001' OR v_folio_2 <> '4800-002' THEN
+    RAISE EXCEPTION 'Folios manuales inesperados: % -> %', v_folio_1, v_folio_2;
   END IF;
-  RAISE NOTICE '[OK] Diana (4800) inserto tramites con folios consecutivos % y %', v_folio_1, v_folio_2;
+  RAISE NOTICE '[OK] Diana (4800) inserto tramites con folios manuales % y %', v_folio_1, v_folio_2;
 
   -- Caso negativo RLS: intentar insertar en programa ajeno (Derecho)
   SELECT id INTO v_prog_derecho FROM public.programas_educativos WHERE unidad_academica_id <> v_ua_id LIMIT 1;

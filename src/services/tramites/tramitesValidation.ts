@@ -6,7 +6,7 @@ export type NivelEducativo = Enums<'nivel_educativo'>
 
 export interface TramiteAlumnoRecord {
   id: string
-  folio: number
+  folio: string | null
   numeroCuenta: string
   nombreAlumno: string
   programaId: number
@@ -28,6 +28,7 @@ export interface TramiteAlumnoRecord {
 }
 
 export interface TramiteAlumnoInput {
+  folio?: string | null
   numeroCuenta: string
   nombreAlumno: string
   programaId: number
@@ -63,11 +64,24 @@ export type TramiteValidationResult =
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const MAX_CUENTA_LENGTH = 30
+const MAX_FOLIO_LENGTH = 40
 const VALID_ESTADOS = new Set<EstadoTramiteAlumno>([
   'PENDIENTE',
   'RESUELTO',
   'CON_ERROR',
 ])
+
+export function normalizeFolio(rawFolio?: string | null): string | null {
+  if (typeof rawFolio !== 'string') {
+    return null
+  }
+  const normalized = rawFolio.trim().toUpperCase()
+  return normalized.length > 0 ? normalized : null
+}
+
+export function formatFolioBadge(folio: string | null): string {
+  return folio ?? 'Sin folio'
+}
 
 /**
  * Mapea una fila unida de public.tramites_alumnos al contrato de servicio y UI.
@@ -107,6 +121,24 @@ export function mapTramiteFromDb(row: TramiteJoinedDbRow): TramiteAlumnoRecord {
 export function validateTramiteAlumnoInput(
   input: TramiteAlumnoInput
 ): TramiteValidationResult {
+  const folio = normalizeFolio(input.folio)
+  if (folio !== null) {
+    if (folio.length > MAX_FOLIO_LENGTH) {
+      return {
+        valid: false,
+        field: 'folio',
+        error: `El folio no debe exceder ${MAX_FOLIO_LENGTH} caracteres.`,
+      }
+    }
+    if (/\s/.test(folio) || containsSqlInjectionPattern(folio)) {
+      return {
+        valid: false,
+        field: 'folio',
+        error: 'El folio no debe contener espacios ni caracteres inválidos.',
+      }
+    }
+  }
+
   const numeroCuenta =
     typeof input.numeroCuenta === 'string' ? input.numeroCuenta.trim() : ''
   if (!numeroCuenta || numeroCuenta.length > MAX_CUENTA_LENGTH) {
@@ -197,6 +229,7 @@ export function validateTramiteAlumnoInput(
   return {
     valid: true,
     data: {
+      folio,
       numeroCuenta,
       nombreAlumno,
       programaId: input.programaId,

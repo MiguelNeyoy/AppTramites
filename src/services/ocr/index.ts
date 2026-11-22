@@ -1,0 +1,25 @@
+export {
+  extractDocumentWithOcr,
+  type ExtractOcrOptions,
+} from './ocr.service'
+export {
+  buildOcrDocumentResult,
+  hasMinimumTramiteFields,
+  isSupportedOcrImageFile,
+  isSupportedOcrPdfFile,
+  LOW_OCR_CONFIDENCE_THRESHOLD,
+  mapTesseractStatusToProgress,
+  MAX_OCR_IMAGE_SIZE_BYTES,
+  MAX_OCR_PDF_PAGES,
+  MAX_OCR_PDF_SIZE_BYTES,
+  normalizeOcrConfidence,
+  postProcessOcrText,
+  SUPPORTED_OCR_IMAGE_EXTENSIONS,
+  SUPPORTED_OCR_IMAGE_MIMES,
+  validateOcrFile,
+  type OcrDocumentExtraction,
+  type OcrExtractionMetadata,
+  type OcrFileValidationResult,
+  type OcrProgressUpdate,
+  type OcrStage,
+} from './ocrValidation'

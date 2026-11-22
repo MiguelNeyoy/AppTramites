@@ -321,9 +321,9 @@ export function FichasNuevoIngresoView({
                         <SelectItem
                           key={p.id}
                           value={String(p.id)}
-                          className="font-mono text-xs"
+                          className="font-mono tabular-nums text-xs"
                         >
-                          {p.nombre}
+                          Periodo {p.numeroPeriodo}
                         </SelectItem>
                       ))}
                     </SelectContent>

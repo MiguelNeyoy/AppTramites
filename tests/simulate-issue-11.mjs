@@ -85,11 +85,13 @@ async function runIssueSimulation() {
   const targetPeriodo = periodos[0]
   const uniqueSuffix = String(Date.now()).slice(-6)
 
-  // 3. Happy path en tramites_alumnos: folio consecutivo y estado default
+  // 3. Happy path en tramites_alumnos: folio manual unico por tramite/periodo y estado default
   if (perfil.rol !== 'NUEVO_INGRESO') {
+    const manualFolio = `SIM11-${uniqueSuffix}`
     const { data: createdTramite, error: createTramiteErr } = await supabase
       .from('tramites_alumnos')
       .insert({
+        folio: manualFolio,
         numero_cuenta: `2026${uniqueSuffix}`,
         nombre_alumno: `Alumno Simulacion ${uniqueSuffix}`,
         programa_id: targetPrograma.id,
@@ -101,7 +103,7 @@ async function runIssueSimulation() {
       .single()
 
     assert.ifError(createTramiteErr)
-    assert.ok(typeof createdTramite.folio === 'number' && createdTramite.folio > 0)
+    assert.equal(createdTramite.folio, manualFolio)
     assert.equal(createdTramite.estado, 'PENDIENTE')
     cleanupTasks.push(() =>
       supabase.from('tramites_alumnos').delete().eq('id', createdTramite.id)

@@ -84,7 +84,20 @@ export function mapSupabaseError(error: unknown): AppServiceError {
   const err = (error ?? {}) as SupabaseLikeError
   const rawCode = typeof err.code === 'string' ? err.code : undefined
   const message = typeof err.message === 'string' ? err.message : ''
+  const details = typeof err.details === 'string' ? err.details : ''
   const lowerMessage = message.toLowerCase()
+  const lowerDetails = details.toLowerCase()
+
+  if (
+    rawCode === '23505' &&
+    (lowerMessage.includes('folio') || lowerDetails.includes('folio'))
+  ) {
+    return new AppServiceError(
+      'UNIQUE_VIOLATION',
+      'Ese folio ya está registrado para este trámite y periodo escolar.',
+      { rawCode, field: 'folio' }
+    )
+  }
 
   if (rawCode && rawCode in POSTGRES_ERROR_MAP) {
     const mapped = POSTGRES_ERROR_MAP[rawCode]

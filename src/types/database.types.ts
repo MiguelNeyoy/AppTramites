@@ -190,14 +190,14 @@ isOneToOne: false
                   ]
                 },"tramites_alumnos": {
                   Row: {
-                    "archivo_pdf_url": string | null,"created_at": string,"estado": Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro": string,"folio": number,"id": string,"nombre_alumno": string,"numero_cuenta": string,"observaciones": string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at": string,"usuario_id": string
+                    "archivo_pdf_url": string | null,"created_at": string,"estado": Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro": string,"folio": string | null,"id": string,"nombre_alumno": string,"numero_cuenta": string,"observaciones": string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at": string,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: never,"id"?: string,"nombre_alumno": string,"numero_cuenta": string,"observaciones"?: string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at"?: string,"usuario_id"?: string
+                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: string | null,"id"?: string,"nombre_alumno": string,"numero_cuenta": string,"observaciones"?: string | null,"periodo_id": number,"programa_id": number,"tipo_tramite_id": number,"updated_at"?: string,"usuario_id"?: string
                   }
                   Update: {
-                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: never,"id"?: string,"nombre_alumno"?: string,"numero_cuenta"?: string,"observaciones"?: string | null,"periodo_id"?: number,"programa_id"?: number,"tipo_tramite_id"?: number,"updated_at"?: string,"usuario_id"?: string
+                    "archivo_pdf_url"?: string | null,"created_at"?: string,"estado"?: Database["public"]['Enums']["estado_tramite_alumno"],"fecha_registro"?: string,"folio"?: string | null,"id"?: string,"nombre_alumno"?: string,"numero_cuenta"?: string,"observaciones"?: string | null,"periodo_id"?: number,"programa_id"?: number,"tipo_tramite_id"?: number,"updated_at"?: string,"usuario_id"?: string
                   }
                   Relationships: [
                     {

@@ -124,7 +124,7 @@ export function buildInitialTramitesAlumnosMock(): TramiteAlumnoRecord[] {
   return [
     {
       id: 'tr-1',
-      folio: 104,
+      folio: '0104',
       numeroCuenta: '20210041',
       nombreAlumno: 'LOPEZ HERNANDEZ JUAN CARLOS',
       programaId: 101,
@@ -146,7 +146,7 @@ export function buildInitialTramitesAlumnosMock(): TramiteAlumnoRecord[] {
     },
     {
       id: 'tr-2',
-      folio: 103,
+      folio: '0103',
       numeroCuenta: '20224819',
       nombreAlumno: 'SANCHEZ MORALES DANIELA',
       programaId: 601,
@@ -168,7 +168,7 @@ export function buildInitialTramitesAlumnosMock(): TramiteAlumnoRecord[] {
     },
     {
       id: 'tr-3',
-      folio: 102,
+      folio: '0102',
       numeroCuenta: '20231088',
       nombreAlumno: 'RAMIREZ TORRES JESUS ALBERTO',
       programaId: 201,
@@ -190,7 +190,7 @@ export function buildInitialTramitesAlumnosMock(): TramiteAlumnoRecord[] {
     },
     {
       id: 'tr-4',
-      folio: 101,
+      folio: '0101',
       numeroCuenta: '20209912',
       nombreAlumno: 'GARCIA VEGA SOFIA VALENTINA',
       programaId: 701,

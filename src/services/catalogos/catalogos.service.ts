@@ -29,7 +29,7 @@ const PROGRAMAS_SELECT =
 const TRAMITES_SELECT =
   'id, nombre, modulo, permite_pdf, activo, created_at' as const
 const PERIODOS_SELECT =
-  'id, nombre, numero_periodo, fecha_inicio, fecha_fin, activo, created_at' as const
+  'id, nombre, ciclo_escolar, numero_periodo, fecha_inicio, fecha_fin, activo, created_at' as const
 
 export interface FetchCatalogosOptions {
   onlyActive?: boolean
@@ -111,11 +111,20 @@ export async function fetchTiposTramite(options?: {
 export async function fetchPeriodosEscolares(options?: {
   onlyActive?: boolean
 }): Promise<PeriodoEscolarCatalogo[]> {
+  const { data: ensuredData, error: rpcError } = await supabase.rpc(
+    'ensure_ciclos_escolares'
+  )
+
+  if (!rpcError && Array.isArray(ensuredData)) {
+    const mapped = ensuredData.map(mapPeriodoFromDb)
+    return options?.onlyActive ? mapped.filter((p) => p.activo) : mapped
+  }
+
   let query = supabase
     .from('periodos_escolares')
     .select(PERIODOS_SELECT)
-    .order('fecha_inicio', { ascending: false })
-    .order('numero_periodo', { ascending: false })
+    .order('ciclo_escolar', { ascending: true })
+    .order('numero_periodo', { ascending: true })
 
   if (options?.onlyActive) {
     query = query.eq('activo', true)
@@ -126,6 +135,16 @@ export async function fetchPeriodosEscolares(options?: {
     throw mapSupabaseError(error)
   }
 
+  return (data ?? []).map(mapPeriodoFromDb)
+}
+
+export async function generarSiguienteCicloEscolar(): Promise<
+  PeriodoEscolarCatalogo[]
+> {
+  const { data, error } = await supabase.rpc('generar_siguiente_ciclo_escolar')
+  if (error) {
+    throw mapSupabaseError(error)
+  }
   return (data ?? []).map(mapPeriodoFromDb)
 }
 

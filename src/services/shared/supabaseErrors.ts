@@ -89,6 +89,17 @@ export function mapSupabaseError(error: unknown): AppServiceError {
   const lowerDetails = details.toLowerCase()
 
   if (
+    rawCode === '23514' &&
+    lowerMessage.includes('periodo 1')
+  ) {
+    return new AppServiceError(
+      'CHECK_VIOLATION',
+      'El Periodo 1 solo admite actas Ordinaria, Extraordinaria y Regularización.',
+      { rawCode, field: 'tipoActa' }
+    )
+  }
+
+  if (
     rawCode === '23505' &&
     (lowerMessage.includes('folio') || lowerDetails.includes('folio'))
   ) {

@@ -12,6 +12,7 @@ export {
   fetchProgramasEducativos,
   fetchTiposTramite,
   fetchUnidadesAcademicas,
+  generarSiguienteCicloEscolar,
   updatePeriodoEscolar,
   updateProgramaEducativo,
   updateTipoTramite,
@@ -19,10 +20,14 @@ export {
   type FetchCatalogosOptions,
 } from './catalogos.service'
 export {
+  deriveCicloEscolar,
+  extractCiclosEscolares,
+  formatCicloEscolarLabel,
   mapPeriodoFromDb,
   mapProgramaFromDb,
   mapTipoTramiteFromDb,
   mapUnidadFromDb,
+  resolvePeriodoByCicloAndNumero,
   validatePeriodoInput,
   validateProgramaInput,
   validateTipoTramiteInput,

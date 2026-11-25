@@ -40,15 +40,17 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { NivelFilter } from '@/features/dashboard/types'
-import type {
-  PeriodoEscolarCatalogo,
-  PeriodoEscolarInput,
-  ProgramaEducativoCatalogo,
-  ProgramaEducativoInput,
-  TipoTramiteCatalogo,
-  TipoTramiteInput,
-  UnidadAcademicaCatalogo,
-  UnidadAcademicaInput,
+import {
+  deriveCicloEscolar,
+  formatCicloEscolarLabel,
+  type PeriodoEscolarCatalogo,
+  type PeriodoEscolarInput,
+  type ProgramaEducativoCatalogo,
+  type ProgramaEducativoInput,
+  type TipoTramiteCatalogo,
+  type TipoTramiteInput,
+  type UnidadAcademicaCatalogo,
+  type UnidadAcademicaInput,
 } from '@/services/catalogos'
 import { useCatalogos, type DeleteTarget } from '../hooks/useCatalogos'
 import {
@@ -97,6 +99,7 @@ export function CatalogosView({
     saveTramite,
     toggleTramiteActivo,
     savePeriodo,
+    generateNextCiclo,
     togglePeriodoActivo,
     removeItem,
   } = useCatalogos()
@@ -393,6 +396,19 @@ export function CatalogosView({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {activeTab === 'periodos' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isMutating}
+              onClick={() => void generateNextCiclo()}
+              className="h-9 gap-1.5 text-xs font-semibold"
+            >
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>Generar siguiente ciclo (P1 y P2)</span>
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -859,8 +875,22 @@ export function CatalogosView({
                           !periodo.activo && 'opacity-60'
                         )}
                       >
-                        <TableCell className="py-2 font-mono text-xs font-semibold text-foreground">
-                          {periodo.nombre}
+                        <TableCell className="py-2">
+                          <div className="leading-tight">
+                            <p className="font-mono text-xs font-bold text-foreground">
+                              {formatCicloEscolarLabel(
+                                deriveCicloEscolar({
+                                  cicloEscolar: periodo.cicloEscolar,
+                                  nombre: periodo.nombre,
+                                  fechaInicio: periodo.fechaInicio,
+                                  numeroPeriodo: periodo.numeroPeriodo,
+                                })
+                              )}
+                            </p>
+                            <span className="text-[11px] text-muted-foreground">
+                              {periodo.nombre}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="py-2">
                           <Badge

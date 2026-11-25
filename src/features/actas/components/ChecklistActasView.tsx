@@ -1,9 +1,10 @@
 import * as React from 'react'
 import {
+  Calendar,
   CheckCircle2,
   Eye,
   EyeOff,
-  RefreshCw,
+  ListChecks,
   Search,
   Sparkles,
 } from 'lucide-react'
@@ -18,14 +19,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -44,46 +37,42 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { NivelFilter } from '@/features/dashboard/types'
 import {
-  ACTA_COLUMNS,
-  PERIODO_ACTA_OPTIONS,
-  RESPONSABLES_ACTA_CATALOGO,
-  UNIDADES_ACADEMICAS_CATALOGO,
-  buildInitialActasMatrix,
-  getPeriodoActaLabel,
+  deriveCicloEscolar,
+  extractCiclosEscolares,
+  formatCicloEscolarLabel,
+  resolvePeriodoByCicloAndNumero,
+} from '@/services/catalogos'
+import {
+  computeChecklistStats,
+  filterVisibleActaRows,
+  formatPeriodoCortoLabel,
+  getActaColumnsForPeriodo,
+  getInitialEtapaActiva,
   isActaRowCompleted,
-  resetCompletedActaRows,
+  isEtapaCompleted,
+  resolveAutoAdvanceEtapa,
   type ActaMatrixRow,
   type EstadoActa,
-  type PeriodoActaKey,
-  type PeriodoActaOption,
-  type ResponsableActaOption,
-  type TipoActaKey,
-} from './actasMockData'
+  type EtapaChecklistFilter,
+  type TipoActa,
+} from '@/services/actas'
+import { useChecklistActas } from '../hooks/useChecklistActas'
+import {
+  SeguimientoActasModal,
+  type SeguimientoTarget,
+} from './SeguimientoActasModal'
 
 const UNASSIGNED_SELECT_VALUE = '__SIN_ASIGNAR__'
 
 interface ChecklistActasViewProps {
   nivel: NivelFilter
-  rowsExternas?: ActaMatrixRow[]
-  responsablesExternos?: ResponsableActaOption[]
-  periodosExternos?: PeriodoActaOption[]
-  onChangeEstadoActa?: (
-    programaId: number,
-    tipoActa: TipoActaKey,
-    nextEstado: EstadoActa
-  ) => void
-  onChangeResponsable?: (
-    programaId: number,
-    responsableId: string | null
-  ) => void
-  onChangePeriodo?: (
-    programaId: number,
-    periodo: PeriodoActaKey | null
-  ) => void
-  onReincorporarTodas?: () => void
+  currentUserId?: string
+  refreshSignal?: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 function getActaCellClass(estado: EstadoActa): string {
@@ -96,322 +85,377 @@ function getActaCellClass(estado: EstadoActa): string {
   return 'bg-destructive/10'
 }
 
-function getPeriodoTriggerClass(periodo: PeriodoActaKey | null): string {
-  if (periodo === 'PERIODO_1') {
+function getPeriodoBadgeClass(numeroPeriodo: number): string {
+  if (numeroPeriodo === 1) {
     return 'border-blue-500/30 bg-blue-500/10 font-semibold text-blue-700 dark:text-blue-300'
   }
-  if (periodo === 'PERIODO_2') {
-    return 'border-indigo-500/30 bg-indigo-500/10 font-semibold text-indigo-700 dark:text-indigo-300'
+  return 'border-indigo-500/30 bg-indigo-500/10 font-semibold text-indigo-700 dark:text-indigo-300'
+}
+
+function formatUpdatedDateShort(iso: string | null): string | null {
+  if (!iso) {
+    return null
   }
-  return 'border-dashed border-border bg-background/70 text-muted-foreground'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return new Intl.DateTimeFormat('es-MX', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
 }
 
 export function ChecklistActasView({
   nivel,
-  rowsExternas,
-  responsablesExternos,
-  periodosExternos,
-  onChangeEstadoActa,
-  onChangeResponsable,
-  onChangePeriodo,
-  onReincorporarTodas,
+  currentUserId,
+  refreshSignal,
+  onLoadingChange,
 }: ChecklistActasViewProps) {
-  const [localRows, setLocalRows] = React.useState<ActaMatrixRow[]>(() =>
-    buildInitialActasMatrix()
-  )
+  const {
+    unidades,
+    periodos,
+    responsables,
+    selectedPeriodo,
+    selectedPeriodoId,
+    rows,
+    isLoading,
+    isMutating,
+    isOfflinePreview,
+    selectPeriodo,
+    changeEstadoActa,
+    changeResponsable,
+  } = useChecklistActas({
+    currentUserId,
+    refreshSignal,
+    onLoadingChange,
+  })
+
   const [searchQuery, setSearchQuery] = React.useState('')
   const [unidadFilter, setUnidadFilter] = React.useState<string>('TODAS')
-  const [periodoFilter, setPeriodoFilter] = React.useState<
-    'TODOS' | PeriodoActaKey | 'SIN_ASIGNAR'
-  >('TODOS')
+  const [etapaActiva, setEtapaActiva] =
+    React.useState<EtapaChecklistFilter>('ORDINARIA')
   const [limpiezaAutomatica, setLimpiezaAutomatica] = React.useState(true)
   const [mostrarCompletadas, setMostrarCompletadas] = React.useState(false)
-  const [reincorporarDialogOpen, setReincorporarDialogOpen] =
-    React.useState(false)
+  const [seguimientoOpen, setSeguimientoOpen] = React.useState(false)
+  const [seguimientoTarget, setSeguimientoTarget] =
+    React.useState<SeguimientoTarget>('RESUMEN')
 
-  const rows = rowsExternas ?? localRows
-  const responsablesCatalogo =
-    responsablesExternos ?? RESPONSABLES_ACTA_CATALOGO
-  const periodosCatalogo = periodosExternos ?? PERIODO_ACTA_OPTIONS
+  const numeroPeriodoActual = selectedPeriodo?.numeroPeriodo ?? 1
+  const cicloEscolarActual = React.useMemo(() => {
+    if (!selectedPeriodo) {
+      return '2026-2027'
+    }
+    return deriveCicloEscolar({
+      cicloEscolar: selectedPeriodo.cicloEscolar,
+      nombre: selectedPeriodo.nombre,
+      fechaInicio: selectedPeriodo.fechaInicio,
+      numeroPeriodo: selectedPeriodo.numeroPeriodo,
+    })
+  }, [selectedPeriodo])
+
+  const ciclosDisponibles = React.useMemo(
+    () => extractCiclosEscolares(periodos),
+    [periodos]
+  )
+
+  const periodosDelCicloActual = React.useMemo(
+    () =>
+      periodos
+        .filter(
+          (p) =>
+            deriveCicloEscolar({
+              cicloEscolar: p.cicloEscolar,
+              nombre: p.nombre,
+              fechaInicio: p.fechaInicio,
+              numeroPeriodo: p.numeroPeriodo,
+            }) === cicloEscolarActual
+        )
+        .sort((a, b) => a.numeroPeriodo - b.numeroPeriodo),
+    [cicloEscolarActual, periodos]
+  )
+
+  const activeColumns = React.useMemo(
+    () => getActaColumnsForPeriodo(numeroPeriodoActual),
+    [numeroPeriodoActual]
+  )
 
   const responsablesMap = React.useMemo(
-    () => new Map(responsablesCatalogo.map((item) => [item.id, item.nombre])),
-    [responsablesCatalogo]
+    () => new Map(responsables.map((item) => [item.id, item.nombre])),
+    [responsables]
   )
 
   const rowsByNivel = React.useMemo(
-    () =>
-      rows.filter((row) => nivel === 'TODOS' || row.nivel === nivel),
+    () => rows.filter((row) => nivel === 'TODOS' || row.nivel === nivel),
     [nivel, rows]
   )
 
   const unidadesDisponibles = React.useMemo(
     () =>
-      UNIDADES_ACADEMICAS_CATALOGO.filter(
-        (ua) => nivel === 'TODOS' || ua.nivel === nivel
-      ),
-    [nivel]
+      unidades.filter((ua) => nivel === 'TODOS' || ua.nivel === nivel),
+    [nivel, unidades]
   )
 
-  const visibleRows = React.useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    const shouldHideCompleted = limpiezaAutomatica && !mostrarCompletadas
-
-    return rowsByNivel.filter((row) => {
-      if (shouldHideCompleted && isActaRowCompleted(row)) {
-        return false
-      }
-      if (
-        unidadFilter !== 'TODAS' &&
-        String(row.unidadAcademicaId) !== unidadFilter
-      ) {
-        return false
-      }
-      if (periodoFilter === 'SIN_ASIGNAR' && row.periodo !== null) {
-        return false
-      }
-      if (
-        periodoFilter !== 'TODOS' &&
-        periodoFilter !== 'SIN_ASIGNAR' &&
-        row.periodo !== periodoFilter
-      ) {
-        return false
-      }
-      if (!q) {
-        return true
-      }
-
-      const responsableNombre = row.responsableId
-        ? (responsablesMap.get(row.responsableId) ?? '')
-        : ''
-      const periodoLabel = getPeriodoActaLabel(row.periodo)
-
-      return (
-        row.claveUa.toLowerCase().includes(q) ||
-        row.nombreUa.toLowerCase().includes(q) ||
-        row.clavePrograma.toLowerCase().includes(q) ||
-        row.nombrePrograma.toLowerCase().includes(q) ||
-        responsableNombre.toLowerCase().includes(q) ||
-        periodoLabel.toLowerCase().includes(q)
-      )
-    })
-  }, [
-    limpiezaAutomatica,
-    mostrarCompletadas,
-    periodoFilter,
-    responsablesMap,
-    rowsByNivel,
-    searchQuery,
-    unidadFilter,
-  ])
-
-  const stats = React.useMemo(() => {
-    const totalProgramas = rowsByNivel.length
-    const completados = rowsByNivel.filter(isActaRowCompleted).length
-    const pendientes = totalProgramas - completados
-
-    const porActa = ACTA_COLUMNS.map((col) => {
-      let generadas = 0
-      let aplicables = 0
-      for (const r of rowsByNivel) {
-        if (r.estados[col.key] !== 'NO_APLICA') {
-          aplicables += 1
-          if (r.estados[col.key] === 'GENERADA') {
-            generadas += 1
-          }
-        }
-      }
-      return {
-        key: col.key,
-        label: col.label,
-        generadas,
-        aplicables,
-      }
-    })
-
-    return {
-      totalProgramas,
-      completados,
-      pendientes,
-      porActa,
+  const lastPeriodoInitializedRef = React.useRef<string>('')
+  React.useEffect(() => {
+    if (isLoading || !selectedPeriodo) {
+      return
     }
-  }, [rowsByNivel])
+    const initKey = `${selectedPeriodo.id}:${nivel}`
+    if (lastPeriodoInitializedRef.current === initKey) {
+      return
+    }
+    lastPeriodoInitializedRef.current = initKey
+    setEtapaActiva(getInitialEtapaActiva(rowsByNivel, activeColumns))
+    setMostrarCompletadas(false)
+    setUnidadFilter('TODAS')
+  }, [activeColumns, isLoading, nivel, rowsByNivel, selectedPeriodo])
 
-  const applyLocalEstadoChange = (
-    programaId: number,
-    tipoActa: TipoActaKey,
+  const stats = React.useMemo(
+    () => computeChecklistStats(rowsByNivel, activeColumns),
+    [activeColumns, rowsByNivel]
+  )
+
+  const displayedActaColumns = React.useMemo(() => {
+    if (etapaActiva === 'TODAS') {
+      return activeColumns
+    }
+    const matched = activeColumns.filter((col) => col.key === etapaActiva)
+    return matched.length > 0 ? matched : activeColumns
+  }, [activeColumns, etapaActiva])
+
+  const isSelectedStageCompleted = React.useMemo(() => {
+    if (etapaActiva === 'TODAS') {
+      return stats.isAllCompleted
+    }
+    return isEtapaCompleted(rowsByNivel, etapaActiva)
+  }, [etapaActiva, rowsByNivel, stats.isAllCompleted])
+
+  const visibleRows = React.useMemo(
+    () =>
+      filterVisibleActaRows({
+        rows: rowsByNivel,
+        activeColumns,
+        etapaActiva,
+        unidadFilter,
+        searchQuery,
+        limpiezaAutomatica,
+        mostrarCompletadas,
+        responsablesMap,
+      }),
+    [
+      activeColumns,
+      etapaActiva,
+      limpiezaAutomatica,
+      mostrarCompletadas,
+      responsablesMap,
+      rowsByNivel,
+      searchQuery,
+      unidadFilter,
+    ]
+  )
+
+  const openSeguimientoModal = (target: SeguimientoTarget) => {
+    setSeguimientoTarget(target)
+    setSeguimientoOpen(true)
+  }
+
+  const handleCicloChange = (nextCiclo: string) => {
+    const matched = resolvePeriodoByCicloAndNumero(
+      periodos,
+      nextCiclo,
+      numeroPeriodoActual
+    )
+    if (matched) {
+      void selectPeriodo(matched.id)
+    }
+  }
+
+  const handlePeriodoChange = (value: string) => {
+    const nextId = Number(value)
+    if (!Number.isInteger(nextId) || nextId <= 0) {
+      return
+    }
+    void selectPeriodo(nextId)
+  }
+
+  const handleEstadoMutation = async (
+    row: ActaMatrixRow,
+    tipoActa: TipoActa,
     nextEstado: EstadoActa
   ) => {
-    const targetRow = localRows.find((row) => row.programaId === programaId)
-    const updatedPreview: ActaMatrixRow | null = targetRow
-      ? {
-          ...targetRow,
-          estados: {
-            ...targetRow.estados,
-            [tipoActa]: nextEstado,
-          },
-        }
-      : null
-
-    setLocalRows((prev) =>
-      prev.map((row) =>
-        row.programaId !== programaId
-          ? row
-          : {
-              ...row,
-              estados: {
-                ...row.estados,
-                [tipoActa]: nextEstado,
-              },
-            }
-      )
+    const prevSnapshot = rowsByNivel
+    const predictedNext = rowsByNivel.map((item) =>
+      item.programaId === row.programaId
+        ? {
+            ...item,
+            estados: {
+              ...item.estados,
+              [tipoActa]: nextEstado,
+            },
+          }
+        : item
     )
 
+    const ok = await changeEstadoActa(row, tipoActa, nextEstado)
+    if (!ok) {
+      return
+    }
+
+    const advance = resolveAutoAdvanceEtapa({
+      prevRows: prevSnapshot,
+      nextRows: predictedNext,
+      currentEtapa: etapaActiva,
+      activeColumns,
+    })
+
+    if (advance.advancedFrom && advance.advancedTo) {
+      setEtapaActiva(advance.nextEtapa)
+      if (advance.advancedTo === 'TODAS') {
+        toast.success(
+          `Etapa ${advance.advancedFrom.label} completada. Todas las actas del periodo quedaron registradas.`
+        )
+      } else {
+        toast.success(
+          `${advance.advancedFrom.label} completada al 100%. Pasando a ${advance.advancedTo.label}.`
+        )
+      }
+      return
+    }
+
     if (
-      updatedPreview &&
       limpiezaAutomatica &&
       !mostrarCompletadas &&
-      isActaRowCompleted(updatedPreview)
+      nextEstado !== 'PENDIENTE'
     ) {
-      toast.success(
-        `[${updatedPreview.claveUa}] ${updatedPreview.nombrePrograma} completado y limpiado de pendientes.`,
-        {
-          action: {
-            label: 'Ver todas',
-            onClick: () => setMostrarCompletadas(true),
-          },
-        }
+      const targetNextRow = predictedNext.find(
+        (item) => item.programaId === row.programaId
       )
+      const completedInScope =
+        etapaActiva === 'TODAS'
+          ? targetNextRow && isActaRowCompleted(targetNextRow, activeColumns)
+          : targetNextRow && targetNextRow.estados[etapaActiva] !== 'PENDIENTE'
+
+      if (completedInScope) {
+        toast.success(
+          `[${row.claveUa}] ${row.nombrePrograma} registrado y guardado.`,
+          {
+            action: {
+              label: 'Ver todas',
+              onClick: () => setMostrarCompletadas(true),
+            },
+          }
+        )
+      }
     }
   }
 
   const handleToggleCheckbox = (
     row: ActaMatrixRow,
-    tipoActa: TipoActaKey,
+    tipoActa: TipoActa,
     checked: boolean
   ) => {
     const nextEstado: EstadoActa = checked ? 'GENERADA' : 'PENDIENTE'
-    if (onChangeEstadoActa) {
-      onChangeEstadoActa(row.programaId, tipoActa, nextEstado)
-      return
-    }
-    applyLocalEstadoChange(row.programaId, tipoActa, nextEstado)
+    void handleEstadoMutation(row, tipoActa, nextEstado)
   }
 
-  const handleToggleNoAplica = (row: ActaMatrixRow, tipoActa: TipoActaKey) => {
+  const handleToggleNoAplica = (row: ActaMatrixRow, tipoActa: TipoActa) => {
     const nextEstado: EstadoActa =
       row.estados[tipoActa] === 'NO_APLICA' ? 'PENDIENTE' : 'NO_APLICA'
-    if (onChangeEstadoActa) {
-      onChangeEstadoActa(row.programaId, tipoActa, nextEstado)
-      return
-    }
-    applyLocalEstadoChange(row.programaId, tipoActa, nextEstado)
+    void handleEstadoMutation(row, tipoActa, nextEstado)
   }
 
-  const handleChangeResponsable = (
-    row: ActaMatrixRow,
-    nextResponsableId: string | null
-  ) => {
-    if (onChangeResponsable) {
-      onChangeResponsable(row.programaId, nextResponsableId)
-      return
-    }
-    setLocalRows((prev) =>
-      prev.map((item) =>
-        item.programaId === row.programaId
-          ? { ...item, responsableId: nextResponsableId }
-          : item
-      )
-    )
-  }
-
-  const handleChangePeriodo = (
-    row: ActaMatrixRow,
-    nextPeriodo: PeriodoActaKey | null
-  ) => {
-    if (onChangePeriodo) {
-      onChangePeriodo(row.programaId, nextPeriodo)
-      return
-    }
-    setLocalRows((prev) =>
-      prev.map((item) =>
-        item.programaId === row.programaId
-          ? { ...item, periodo: nextPeriodo }
-          : item
-      )
-    )
-  }
-
-  const handleClickReincorporar = () => {
-    if (stats.completados === 0) {
-      toast.info('No hay programas completados para reincorporar.')
-      return
-    }
-    setReincorporarDialogOpen(true)
-  }
-
-  const handleConfirmReincorporar = () => {
-    setReincorporarDialogOpen(false)
-    setMostrarCompletadas(false)
-    if (onReincorporarTodas) {
-      onReincorporarTodas()
-      return
-    }
-    const { nextRows, reincorporatedCount } = resetCompletedActaRows(
-      localRows,
-      nivel
-    )
-    setLocalRows(nextRows)
-    toast.success(
-      reincorporatedCount === 1
-        ? 'Se reincorporó 1 programa completado con las casillas vacías.'
-        : `Se reincorporaron ${reincorporatedCount} programas completados con las casillas vacías.`
-    )
-  }
+  const kpiGridCols =
+    activeColumns.length <= 3 ? 'xl:grid-cols-4' : 'xl:grid-cols-6'
 
   return (
     <div className="space-y-4">
-      {/* Tarjetas de avance rápido */}
+      {isOfflinePreview && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          Vista previa local sin sesión activa: los cambios no se persisten en
+          Supabase hasta iniciar sesión.
+        </div>
+      )}
+
+      {/* Tarjetas de avance rápido (clicables para seguimiento detallado por escuela) */}
       <section
         aria-label="Resumen de checklist de actas"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 lg:pr-24"
+        className={cn(
+          'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:pr-24',
+          kpiGridCols
+        )}
       >
-        <Card className="border-border bg-card shadow-sm dark:shadow-none">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => openSeguimientoModal('RESUMEN')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              openSeguimientoModal('RESUMEN')
+            }
+          }}
+          className="cursor-pointer border-border bg-card shadow-sm transition-colors hover:border-primary/50 hover:bg-secondary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:shadow-none"
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Programas Pendientes
             </CardTitle>
             <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
           </CardHeader>
-          <CardContent>
-            <p className="font-mono tabular-nums text-xl font-bold text-foreground">
+          <CardContent className="flex items-end justify-between gap-2">
+            <p className="font-mono text-xl font-bold tabular-nums text-foreground">
               {stats.pendientes}
               <span className="ml-1 text-xs font-normal text-muted-foreground">
                 / {stats.totalProgramas}
               </span>
             </p>
+            <span className="text-[10px] font-medium text-primary">
+              Seguimiento
+            </span>
           </CardContent>
         </Card>
 
         {stats.porActa.map((acta) => (
           <Card
             key={acta.key}
-            className="border-border bg-card shadow-sm dark:shadow-none"
+            role="button"
+            tabIndex={0}
+            onClick={() => openSeguimientoModal(acta.key)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                openSeguimientoModal(acta.key)
+              }
+            }}
+            className={cn(
+              'cursor-pointer border-border bg-card shadow-sm transition-colors hover:border-primary/50 hover:bg-secondary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:shadow-none',
+              acta.isStageCompleted && 'border-emerald-500/40 bg-emerald-500/5'
+            )}
           >
-            <CardHeader className="pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {acta.key === 'PROMOCION_GRADO' || acta.key === 'CIERRE_CICLO'
                   ? acta.label
                   : `Acta ${acta.label}`}
               </CardTitle>
+              {acta.isStageCompleted && (
+                <Badge className="h-4 border-emerald-600/30 bg-emerald-500/15 px-1.5 text-[9px] font-semibold text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300">
+                  100%
+                </Badge>
+              )}
             </CardHeader>
-            <CardContent>
-              <p className="font-mono tabular-nums text-xl font-bold text-emerald-600 dark:text-emerald-400">
+            <CardContent className="flex items-end justify-between gap-2">
+              <p className="font-mono text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {acta.generadas}
                 <span className="ml-1 text-xs font-normal text-muted-foreground">
                   / {acta.aplicables}
                 </span>
               </p>
+              <span className="text-[10px] font-medium text-muted-foreground">
+                Ver detalle
+              </span>
             </CardContent>
           </Card>
         ))}
@@ -419,15 +463,15 @@ export function ChecklistActasView({
 
       {/* Matriz tipo Excel */}
       <Card className="border-border bg-card shadow-sm dark:shadow-none">
-        <CardHeader className="pb-3">
+        <CardHeader className="space-y-3 pb-3">
           <div className="flex flex-col gap-2.5 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="flex flex-1 flex-wrap items-center gap-2">
-              <div className="relative w-full sm:w-60">
+              <div className="relative w-full sm:w-56">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por clave UA, escuela, carrera o responsable..."
+                  placeholder="Buscar escuela, carrera o responsable..."
                   className="h-8 bg-background pl-8 text-xs"
                 />
               </div>
@@ -457,37 +501,57 @@ export function ChecklistActasView({
                 </Select>
               </div>
 
-              <div className="w-full sm:w-40">
+              <div className="w-full sm:w-44">
                 <Select
-                  value={periodoFilter}
-                  onValueChange={(value) =>
-                    setPeriodoFilter(
-                      value as 'TODOS' | PeriodoActaKey | 'SIN_ASIGNAR'
-                    )
-                  }
+                  value={cicloEscolarActual}
+                  onValueChange={handleCicloChange}
+                  disabled={ciclosDisponibles.length === 0 || isLoading}
                 >
                   <SelectTrigger
-                    aria-label="Filtrar por fecha (periodo)"
+                    aria-label="Seleccionar ciclo escolar"
                     className="h-8 bg-background text-xs"
                   >
-                    <SelectValue placeholder="Fecha (Periodo)" />
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <SelectValue placeholder="Ciclo escolar" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="TODOS" className="text-xs">
-                      Todas las fechas
-                    </SelectItem>
-                    {periodosCatalogo.map((periodo) => (
+                    {ciclosDisponibles.map((ciclo) => (
                       <SelectItem
-                        key={periodo.value}
-                        value={periodo.value}
-                        className="font-mono tabular-nums text-xs"
+                        key={ciclo}
+                        value={ciclo}
+                        className="font-mono text-xs font-semibold tabular-nums"
                       >
-                        {periodo.label}
+                        {formatCicloEscolarLabel(ciclo)}
                       </SelectItem>
                     ))}
-                    <SelectItem value="SIN_ASIGNAR" className="text-xs">
-                      Sin periodo
-                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full sm:w-36">
+                <Select
+                  value={selectedPeriodoId ? String(selectedPeriodoId) : ''}
+                  onValueChange={handlePeriodoChange}
+                  disabled={periodosDelCicloActual.length === 0 || isLoading}
+                >
+                  <SelectTrigger
+                    aria-label="Seleccionar periodo del ciclo"
+                    className="h-8 bg-background text-xs"
+                  >
+                    <SelectValue placeholder="Periodo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodosDelCicloActual.map((periodo) => (
+                      <SelectItem
+                        key={periodo.id}
+                        value={String(periodo.id)}
+                        className="font-mono text-xs font-semibold tabular-nums"
+                      >
+                        {formatPeriodoCortoLabel(periodo.numeroPeriodo)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -539,22 +603,56 @@ export function ChecklistActasView({
                   </>
                 )}
               </Button>
-
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleClickReincorporar}
-                className="h-9 gap-1.5 bg-primary text-xs font-bold text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/90"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>Reincorporar Actas</span>
-                {stats.completados > 0 && (
-                  <span className="rounded bg-primary-foreground/20 px-1.5 py-0.5 font-mono text-[10px] tabular-nums">
-                    {stats.completados}
-                  </span>
-                )}
-              </Button>
             </div>
+          </div>
+
+          {/* Barra de etapas progresivas (Opción B) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2.5">
+            <Tabs
+              value={etapaActiva}
+              onValueChange={(value) =>
+                setEtapaActiva(value as EtapaChecklistFilter)
+              }
+            >
+              <TabsList className="h-auto flex-wrap justify-start gap-1 bg-muted/70 p-1">
+                <TabsTrigger value="TODAS" className="h-7 gap-1.5 px-2.5 text-xs">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  <span>Todas ({activeColumns.length})</span>
+                </TabsTrigger>
+                {stats.porActa.map((acta) => (
+                  <TabsTrigger
+                    key={acta.key}
+                    value={acta.key}
+                    className="h-7 gap-1.5 px-2.5 text-xs"
+                  >
+                    <span>
+                      {acta.order}. {acta.label}
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded px-1 py-0.5 font-mono text-[10px] tabular-nums',
+                        acta.isStageCompleted
+                          ? 'bg-emerald-500/15 font-bold text-emerald-700 dark:text-emerald-300'
+                          : 'bg-background/80 text-muted-foreground'
+                      )}
+                    >
+                      {acta.generadas}/{acta.aplicables}
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            {isSelectedStageCompleted && (
+              <Badge className="gap-1 border-emerald-600/30 bg-emerald-500/10 text-[11px] font-medium text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>
+                  {etapaActiva === 'TODAS'
+                    ? 'Periodo completado — rastro visual activo'
+                    : 'Etapa completada — rastro visual activo'}
+                </span>
+              </Badge>
+            )}
           </div>
         </CardHeader>
 
@@ -570,10 +668,12 @@ export function ChecklistActasView({
                     Adscripción Académica
                   </TableHead>
                   <TableHead
-                    colSpan={ACTA_COLUMNS.length}
+                    colSpan={displayedActaColumns.length}
                     className="h-7 border-r border-border bg-secondary/40 text-center text-[10px] font-bold uppercase tracking-widest text-foreground"
                   >
-                    Actas y Cierre de Ciclo
+                    {numeroPeriodoActual === 1
+                      ? 'Actas del Periodo 1'
+                      : 'Actas y Cierre de Ciclo'}
                   </TableHead>
                   <TableHead
                     colSpan={2}
@@ -595,11 +695,11 @@ export function ChecklistActasView({
                   <TableHead className="h-9 w-44 max-w-[176px] border-r border-border bg-secondary/50 px-1.5 text-[10px] font-semibold uppercase tracking-widest">
                     Programa Educativo
                   </TableHead>
-                  {ACTA_COLUMNS.map((col) => (
+                  {displayedActaColumns.map((col) => (
                     <TableHead
                       key={col.key}
                       className={cn(
-                        'h-9 min-w-[88px] border-r border-border px-1.5 text-center text-[10px] font-bold uppercase leading-tight tracking-wider',
+                        'h-9 min-w-[100px] border-r border-border px-1.5 text-center text-[10px] font-bold uppercase leading-tight tracking-wider',
                         col.headerClass
                       )}
                     >
@@ -616,30 +716,39 @@ export function ChecklistActasView({
               </TableHeader>
 
               <TableBody>
-                {visibleRows.length === 0 ? (
+                {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4 + ACTA_COLUMNS.length + 2}
+                      colSpan={4 + displayedActaColumns.length + 2}
+                      className="py-12 text-center text-xs text-muted-foreground"
+                    >
+                      Cargando checklist de actas...
+                    </TableCell>
+                  </TableRow>
+                ) : visibleRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4 + displayedActaColumns.length + 2}
                       className="py-12 text-center text-xs text-muted-foreground"
                     >
                       <div className="mx-auto flex max-w-md flex-col items-center gap-2">
                         <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                         <p className="font-semibold text-foreground">
-                          {stats.completados > 0 && stats.pendientes === 0
-                            ? 'Todas las actas del filtro están completadas'
-                            : 'No hay programas por mostrar'}
+                          {rowsByNivel.length === 0
+                            ? 'No hay programas educativos activos para mostrar'
+                            : 'No hay programas pendientes con los filtros actuales'}
                         </p>
                         <p>
-                          {stats.completados > 0 && stats.pendientes === 0
-                            ? 'Usa Ver todas para consultarlas o Reincorporar Actas para restablecerlas con casillas vacías.'
-                            : 'Ajusta los filtros de búsqueda, unidad o fecha, o usa Ver todas si deseas revisar programas completados.'}
+                          Ajusta el buscador o unidad, o usa Ver todas para
+                          revisar las filas completadas.
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   visibleRows.map((row, idx) => {
-                    const isCompleted = isActaRowCompleted(row)
+                    const isCompleted = isActaRowCompleted(row, activeColumns)
+                    const updatedShort = formatUpdatedDateShort(row.updatedAt)
 
                     return (
                       <TableRow
@@ -649,13 +758,13 @@ export function ChecklistActasView({
                           isCompleted && 'bg-emerald-500/5'
                         )}
                       >
-                        <TableCell className="w-8 px-1 py-1.5 text-center font-mono tabular-nums text-[11px] text-muted-foreground">
+                        <TableCell className="w-8 px-1 py-1.5 text-center font-mono text-[11px] tabular-nums text-muted-foreground">
                           {idx + 1}
                         </TableCell>
                         <TableCell className="w-14 px-1 py-1.5">
                           <Badge
                             variant="secondary"
-                            className="font-mono tabular-nums text-[10px] font-bold"
+                            className="font-mono text-[10px] font-bold tabular-nums"
                           >
                             {row.claveUa}
                           </Badge>
@@ -683,7 +792,7 @@ export function ChecklistActasView({
                           </div>
                         </TableCell>
 
-                        {ACTA_COLUMNS.map((col) => {
+                        {displayedActaColumns.map((col) => {
                           const estado = row.estados[col.key]
                           const isGenerada = estado === 'GENERADA'
                           const isNoAplica = estado === 'NO_APLICA'
@@ -707,6 +816,7 @@ export function ChecklistActasView({
                                 ) : (
                                   <Checkbox
                                     checked={isGenerada}
+                                    disabled={isMutating}
                                     onCheckedChange={(checked) =>
                                       handleToggleCheckbox(
                                         row,
@@ -725,6 +835,7 @@ export function ChecklistActasView({
                                 )}
                                 <button
                                   type="button"
+                                  disabled={isMutating}
                                   onClick={() =>
                                     handleToggleNoAplica(row, col.key)
                                   }
@@ -733,7 +844,7 @@ export function ChecklistActasView({
                                       ? 'Reactivar acta como pendiente'
                                       : 'Marcar como No Aplica (N/A)'
                                   }
-                                  className="rounded px-1 py-0.5 font-mono text-[9px] font-semibold text-muted-foreground transition-colors duration-150 hover:bg-background/80 hover:text-foreground"
+                                  className="rounded px-1 py-0.5 font-mono text-[9px] font-semibold text-muted-foreground transition-colors duration-150 hover:bg-background/80 hover:text-foreground disabled:opacity-50"
                                 >
                                   {isNoAplica ? 'Act.' : 'N/A'}
                                 </button>
@@ -745,8 +856,9 @@ export function ChecklistActasView({
                         <TableCell className="border-r border-border px-2 py-1.5">
                           <Select
                             value={row.responsableId ?? UNASSIGNED_SELECT_VALUE}
+                            disabled={isMutating}
                             onValueChange={(value) =>
-                              handleChangeResponsable(
+                              void changeResponsable(
                                 row,
                                 value === UNASSIGNED_SELECT_VALUE ? null : value
                               )
@@ -770,7 +882,7 @@ export function ChecklistActasView({
                               >
                                 Sin asignar
                               </SelectItem>
-                              {responsablesCatalogo.map((responsable) => (
+                              {responsables.map((responsable) => (
                                 <SelectItem
                                   key={responsable.id}
                                   value={responsable.id}
@@ -784,44 +896,26 @@ export function ChecklistActasView({
                         </TableCell>
 
                         <TableCell className="px-2 py-1.5">
-                          <Select
-                            value={row.periodo ?? UNASSIGNED_SELECT_VALUE}
-                            onValueChange={(value) =>
-                              handleChangePeriodo(
-                                row,
-                                value === UNASSIGNED_SELECT_VALUE
-                                  ? null
-                                  : (value as PeriodoActaKey)
-                              )
-                            }
+                          <div
+                            className="flex flex-col items-start gap-0.5"
+                            title={row.periodoNombre}
                           >
-                            <SelectTrigger
-                              aria-label={`Fecha (periodo) de ${row.nombrePrograma}`}
+                            <Badge
+                              variant="outline"
                               className={cn(
-                                'h-7 w-full px-2 font-mono tabular-nums text-xs transition-colors duration-150',
-                                getPeriodoTriggerClass(row.periodo)
+                                'font-mono text-[10px] tabular-nums',
+                                getPeriodoBadgeClass(row.numeroPeriodo)
                               )}
                             >
-                              <SelectValue placeholder="Sin periodo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem
-                                value={UNASSIGNED_SELECT_VALUE}
-                                className="text-xs text-muted-foreground"
-                              >
-                                Sin periodo
-                              </SelectItem>
-                              {periodosCatalogo.map((periodo) => (
-                                <SelectItem
-                                  key={periodo.value}
-                                  value={periodo.value}
-                                  className="font-mono tabular-nums text-xs"
-                                >
-                                  {periodo.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              {formatCicloEscolarLabel(cicloEscolarActual)} ·{' '}
+                              {row.periodoLabel}
+                            </Badge>
+                            {updatedShort && (
+                              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                                {updatedShort}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -833,79 +927,17 @@ export function ChecklistActasView({
         </CardContent>
       </Card>
 
-      <Dialog
-        open={reincorporarDialogOpen}
-        onOpenChange={setReincorporarDialogOpen}
-      >
-        <DialogContent className="max-w-md gap-0 overflow-hidden border-border bg-card p-0 text-foreground sm:rounded-xl">
-          <DialogHeader className="border-b border-border px-5 py-4 pr-10 text-left">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                <RefreshCw className="h-4 w-4" />
-              </div>
-              <div>
-                <DialogTitle className="text-base font-bold">
-                  Reincorporar actas completadas
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground">
-                  Se restablecerán{' '}
-                  <span className="font-mono font-semibold tabular-nums text-foreground">
-                    {stats.completados}
-                  </span>{' '}
-                  {stats.completados === 1
-                    ? 'programa completado'
-                    : 'programas completados'}{' '}
-                  al listado de pendientes.
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="space-y-3 px-5 py-4">
-            <div className="rounded-lg border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
-              <p>
-                Los programas ya completados volverán a mostrarse{' '}
-                <strong className="font-semibold text-foreground">
-                  vacíos (sin casillas activas)
-                </strong>
-                , limpiando también el responsable y la fecha asignada para
-                iniciar un nuevo ciclo de captura.
-              </p>
-              <p className="mt-2">
-                Los{' '}
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {stats.pendientes}
-                </span>{' '}
-                {stats.pendientes === 1
-                  ? 'programa actualmente en progreso conservará'
-                  : 'programas actualmente en progreso conservarán'}{' '}
-                su avance sin cambios.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="border-t border-border bg-secondary/20 px-5 py-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReincorporarDialogOpen(false)}
-              className="h-8 text-xs"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConfirmReincorporar}
-              className="h-8 gap-1.5 bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>Reincorporar vacías</span>
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SeguimientoActasModal
+        open={seguimientoOpen}
+        onOpenChange={setSeguimientoOpen}
+        target={seguimientoTarget}
+        onTargetChange={setSeguimientoTarget}
+        rows={rowsByNivel}
+        activeColumns={activeColumns}
+        responsablesMap={responsablesMap}
+        periodoLabel={formatPeriodoCortoLabel(numeroPeriodoActual)}
+        periodoNombre={selectedPeriodo?.nombre ?? ''}
+      />
     </div>
   )
 }

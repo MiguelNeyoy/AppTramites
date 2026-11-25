@@ -2,10 +2,14 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  deriveCicloEscolar,
+  extractCiclosEscolares,
+  formatCicloEscolarLabel,
   mapPeriodoFromDb,
   mapProgramaFromDb,
   mapTipoTramiteFromDb,
   mapUnidadFromDb,
+  resolvePeriodoByCicloAndNumero,
   validatePeriodoInput,
   validateProgramaInput,
   validateTipoTramiteInput,
@@ -162,5 +166,55 @@ describe('catalogosValidation - validadores CRUD de catalogo', () => {
     })
     assert.equal(valid.valid, true)
     assert.equal(valid.data?.nombre, '2026-2027')
+  })
+
+  it('ordena ciclos escolares de forma ascendente y resuelve Periodo 1 y Periodo 2 por ciclo', () => {
+    const periodos = [
+      mapPeriodoFromDb({
+        id: 4,
+        nombre: '2027-2028 Periodo 2 (Feb-Jul)',
+        ciclo_escolar: '2027-2028',
+        numero_periodo: 2,
+        fecha_inicio: '2028-02-01',
+        fecha_fin: '2028-07-31',
+        activo: false,
+        created_at: '2026-11-24T00:00:00Z',
+      }),
+      mapPeriodoFromDb({
+        id: 1,
+        nombre: '2026-2027 Periodo 1 (Ago-Ene)',
+        ciclo_escolar: '2026-2027',
+        numero_periodo: 1,
+        fecha_inicio: '2026-08-01',
+        fecha_fin: '2027-01-31',
+        activo: true,
+        created_at: '2026-11-24T00:00:00Z',
+      }),
+      mapPeriodoFromDb({
+        id: 3,
+        nombre: '2027-2028 Periodo 1 (Ago-Ene)',
+        ciclo_escolar: '2027-2028',
+        numero_periodo: 1,
+        fecha_inicio: '2027-08-01',
+        fecha_fin: '2028-01-31',
+        activo: false,
+        created_at: '2026-11-24T00:00:00Z',
+      }),
+    ]
+
+    assert.deepEqual(extractCiclosEscolares(periodos), ['2026-2027', '2027-2028'])
+    assert.equal(formatCicloEscolarLabel('2026-2027'), '2026 - 2027')
+    assert.equal(
+      deriveCicloEscolar({
+        nombre: 'Semestre Feb-Jul',
+        fechaInicio: '2027-02-01',
+        numeroPeriodo: 2,
+      }),
+      '2026-2027'
+    )
+    assert.equal(
+      resolvePeriodoByCicloAndNumero(periodos, '2027-2028', 2)?.id,
+      4
+    )
   })
 })

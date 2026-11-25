@@ -1,9 +1,9 @@
 export { ChecklistActasView } from './components/ChecklistActasView'
 export type {
+  ActaColumnMeta,
   ActaMatrixRow,
   EstadoActa,
-  PeriodoActaKey,
-  PeriodoActaOption,
+  EtapaChecklistFilter,
   ResponsableActaOption,
-  TipoActaKey,
-} from './components/actasMockData'
+  TipoActa,
+} from '@/services/actas'

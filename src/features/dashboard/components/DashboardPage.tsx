@@ -70,7 +70,7 @@ export function DashboardPage({
             type="button"
             variant="outline"
             size="icon"
-            disabled={isActiveViewLoading || activeNav === 'actas'}
+            disabled={isActiveViewLoading}
             onClick={() => setRefreshSignal((prev) => prev + 1)}
             aria-label="Actualizar"
             title="Actualizar"
@@ -103,7 +103,12 @@ export function DashboardPage({
 
         <main className="flex-1 space-y-5 overflow-y-auto p-4 pt-16 sm:p-6 lg:pt-4">
           {activeNav === 'actas' ? (
-            <ChecklistActasView nivel={nivel} />
+            <ChecklistActasView
+              nivel={nivel}
+              currentUserId={perfil?.id}
+              refreshSignal={refreshSignal}
+              onLoadingChange={setIsActiveViewLoading}
+            />
           ) : activeNav === 'fichas' ? (
             <FichasNuevoIngresoView
               userRol={perfil?.rol}

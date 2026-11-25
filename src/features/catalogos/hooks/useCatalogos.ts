@@ -11,7 +11,9 @@ import {
   deleteProgramaEducativo,
   deleteTipoTramite,
   deleteUnidadAcademica,
+  deriveCicloEscolar,
   fetchAllCatalogos,
+  generarSiguienteCicloEscolar,
   updatePeriodoEscolar,
   updateProgramaEducativo,
   updateTipoTramite,
@@ -373,6 +375,89 @@ export function useCatalogos() {
     }
   }
 
+  const generateNextCiclo = async (): Promise<boolean> => {
+    if (isOfflinePreview) {
+      const maxStartYear = periodos.reduce((acc, p) => {
+        const ciclo = deriveCicloEscolar({
+          cicloEscolar: p.cicloEscolar,
+          nombre: p.nombre,
+          fechaInicio: p.fechaInicio,
+          numeroPeriodo: p.numeroPeriodo,
+        })
+        const year = Number(ciclo.slice(0, 4))
+        return Number.isInteger(year) && year > acc ? year : acc
+      }, 2025)
+      const nextYear = Math.max(2026, maxStartYear + 1)
+      const nextCiclo = `${nextYear}-${nextYear + 1}`
+      const maxId = Math.max(0, ...periodos.map((p) => p.id))
+      const created: PeriodoEscolarCatalogo[] = [
+        {
+          id: maxId + 1,
+          nombre: `${nextCiclo} Periodo 1 (Ago-Ene)`,
+          cicloEscolar: nextCiclo,
+          numeroPeriodo: 1,
+          fechaInicio: `${nextYear}-08-01`,
+          fechaFin: `${nextYear + 1}-01-31`,
+          activo: false,
+        },
+        {
+          id: maxId + 2,
+          nombre: `${nextCiclo} Periodo 2 (Feb-Jul)`,
+          cicloEscolar: nextCiclo,
+          numeroPeriodo: 2,
+          fechaInicio: `${nextYear + 1}-02-01`,
+          fechaFin: `${nextYear + 1}-07-31`,
+          activo: false,
+        },
+      ]
+      setPeriodos((prev) => [...prev, ...created])
+      toast.success(
+        `Ciclo ${nextYear} - ${nextYear + 1} generado con Periodo 1 y Periodo 2 (vista previa).`
+      )
+      return true
+    }
+
+    setIsMutating(true)
+    try {
+      const created = await generarSiguienteCicloEscolar()
+      if (created.length > 0) {
+        setPeriodos((prev) => {
+          const existingIds = new Set(prev.map((item) => item.id))
+          const merged = [
+            ...prev,
+            ...created.filter((item) => !existingIds.has(item.id)),
+          ]
+          return merged.sort((a, b) => {
+            const cicloA = deriveCicloEscolar({
+              cicloEscolar: a.cicloEscolar,
+              nombre: a.nombre,
+              fechaInicio: a.fechaInicio,
+              numeroPeriodo: a.numeroPeriodo,
+            })
+            const cicloB = deriveCicloEscolar({
+              cicloEscolar: b.cicloEscolar,
+              nombre: b.nombre,
+              fechaInicio: b.fechaInicio,
+              numeroPeriodo: b.numeroPeriodo,
+            })
+            const cmp = cicloA.localeCompare(cicloB, 'es', { numeric: true })
+            return cmp !== 0 ? cmp : a.numeroPeriodo - b.numeroPeriodo
+          })
+        })
+        const cicloLabel = created[0].cicloEscolar ?? created[0].nombre
+        toast.success(
+          `Ciclo ${cicloLabel} generado con Periodo 1 y Periodo 2.`
+        )
+      }
+      return true
+    } catch (error) {
+      toast.error(mapSupabaseError(error).message)
+      return false
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   const togglePeriodoActivo = async (periodo: PeriodoEscolarCatalogo) => {
     const nextState = !periodo.activo
     if (isOfflinePreview) {
@@ -465,6 +550,7 @@ export function useCatalogos() {
     saveTramite,
     toggleTramiteActivo,
     savePeriodo,
+    generateNextCiclo,
     togglePeriodoActivo,
     removeItem,
   }

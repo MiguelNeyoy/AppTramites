@@ -8,14 +8,14 @@ export type Database = {
           Tables: {
             "checklists_actas": {
                   Row: {
-                    "actualizado_por": string | null,"estado": Database["public"]['Enums']["estado_acta"],"id": string,"periodo_id": number,"programa_id": number,"tipo_acta": Database["public"]['Enums']["tipo_acta"],"updated_at": string
+                    "actualizado_por": string | null,"estado": Database["public"]['Enums']["estado_acta"],"id": string,"periodo_id": number,"programa_id": number,"responsable_id": string | null,"tipo_acta": Database["public"]['Enums']["tipo_acta"],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "actualizado_por"?: string | null,"estado"?: Database["public"]['Enums']["estado_acta"],"id"?: string,"periodo_id": number,"programa_id": number,"tipo_acta": Database["public"]['Enums']["tipo_acta"],"updated_at"?: string
+                    "actualizado_por"?: string | null,"estado"?: Database["public"]['Enums']["estado_acta"],"id"?: string,"periodo_id": number,"programa_id": number,"responsable_id"?: string | null,"tipo_acta": Database["public"]['Enums']["tipo_acta"],"updated_at"?: string
                   }
                   Update: {
-                    "actualizado_por"?: string | null,"estado"?: Database["public"]['Enums']["estado_acta"],"id"?: string,"periodo_id"?: number,"programa_id"?: number,"tipo_acta"?: Database["public"]['Enums']["tipo_acta"],"updated_at"?: string
+                    "actualizado_por"?: string | null,"estado"?: Database["public"]['Enums']["estado_acta"],"id"?: string,"periodo_id"?: number,"programa_id"?: number,"responsable_id"?: string | null,"tipo_acta"?: Database["public"]['Enums']["tipo_acta"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -35,6 +35,12 @@ isOneToOne: false
       columns: ["programa_id"]
 isOneToOne: false
       referencedRelation: "programas_educativos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "checklists_actas_responsable_id_fkey"
+      columns: ["responsable_id"]
+isOneToOne: false
+      referencedRelation: "perfiles"
       referencedColumns: ["id"]
     }
                   ]
@@ -104,14 +110,14 @@ isOneToOne: false
                   ]
                 },"periodos_escolares": {
                   Row: {
-                    "activo": boolean,"created_at": string,"fecha_fin": string,"fecha_inicio": string,"id": number,"nombre": string,"numero_periodo": number
+                    "activo": boolean,"ciclo_escolar": string,"created_at": string,"fecha_fin": string,"fecha_inicio": string,"id": number,"nombre": string,"numero_periodo": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "activo"?: boolean,"created_at"?: string,"fecha_fin": string,"fecha_inicio": string,"id"?: number,"nombre": string,"numero_periodo": number
+                    "activo"?: boolean,"ciclo_escolar"?: string,"created_at"?: string,"fecha_fin": string,"fecha_inicio": string,"id"?: number,"nombre": string,"numero_periodo": number
                   }
                   Update: {
-                    "activo"?: boolean,"created_at"?: string,"fecha_fin"?: string,"fecha_inicio"?: string,"id"?: number,"nombre"?: string,"numero_periodo"?: number
+                    "activo"?: boolean,"ciclo_escolar"?: string,"created_at"?: string,"fecha_fin"?: string,"fecha_inicio"?: string,"id"?: number,"nombre"?: string,"numero_periodo"?: number
                   }
                   Relationships: [
                     
@@ -271,10 +277,41 @@ isOneToOne: false
                            },
 "current_user_unidad_academica_id":
 { Args: Record<PropertyKey, never>; Returns: number
+                           },
+"ensure_ciclos_escolares":
+{ Args: { "p_fecha_referencia"?: string }; Returns: {
+  "activo": boolean
+  "ciclo_escolar": string
+  "created_at": string
+  "fecha_fin": string
+  "fecha_inicio": string
+  "id": number
+  "nombre": string
+  "numero_periodo": number
+}[]
+                           },
+"generar_siguiente_ciclo_escolar":
+{ Args: Record<PropertyKey, never>; Returns: {
+  "activo": boolean
+  "ciclo_escolar": string
+  "created_at": string
+  "fecha_fin": string
+  "fecha_inicio": string
+  "id": number
+  "nombre": string
+  "numero_periodo": number
+}[]
+                           },
+"list_responsables_actas":
+{ Args: Record<PropertyKey, never>; Returns: {
+  "id": string
+  "nombre": string
+  "rol": Database["public"]['Enums']["rol_usuario"]
+}[]
                            }
           }
           Enums: {
-            "estado_acta": "PENDIENTE"|"GENERADA"|"NO_APLICA","estado_tramite_alumno": "PENDIENTE"|"RESUELTO"|"CON_ERROR","estatus_ficha_nuevo_ingreso": "SIN_PROCESO"|"SIN_PAGO"|"FICHA_VENCIDA"|"FICHA_CANCELADA","modulo_tramite": "TRAMITES_GENERALES"|"NUEVO_INGRESO","nivel_educativo": "LICENCIATURA"|"BACHILLERATO","rol_usuario": "ADMIN"|"LICENCIATURA"|"BACHILLERATO"|"NUEVO_INGRESO"|"UNIDAD_ACADEMICA","tipo_acta": "ORDINARIA"|"EXTRAORDINARIA"|"REGULARIZACION"
+            "estado_acta": "PENDIENTE"|"GENERADA"|"NO_APLICA","estado_tramite_alumno": "PENDIENTE"|"RESUELTO"|"CON_ERROR","estatus_ficha_nuevo_ingreso": "SIN_PROCESO"|"SIN_PAGO"|"FICHA_VENCIDA"|"FICHA_CANCELADA","modulo_tramite": "TRAMITES_GENERALES"|"NUEVO_INGRESO","nivel_educativo": "LICENCIATURA"|"BACHILLERATO","rol_usuario": "ADMIN"|"LICENCIATURA"|"BACHILLERATO"|"NUEVO_INGRESO"|"UNIDAD_ACADEMICA","tipo_acta": "ORDINARIA"|"EXTRAORDINARIA"|"REGULARIZACION"|"PROMOCION_GRADO"|"CIERRE_CICLO"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -390,7 +427,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "estado_acta": ["PENDIENTE", "GENERADA", "NO_APLICA"],"estado_tramite_alumno": ["PENDIENTE", "RESUELTO", "CON_ERROR"],"estatus_ficha_nuevo_ingreso": ["SIN_PROCESO", "SIN_PAGO", "FICHA_VENCIDA", "FICHA_CANCELADA"],"modulo_tramite": ["TRAMITES_GENERALES", "NUEVO_INGRESO"],"nivel_educativo": ["LICENCIATURA", "BACHILLERATO"],"rol_usuario": ["ADMIN", "LICENCIATURA", "BACHILLERATO", "NUEVO_INGRESO", "UNIDAD_ACADEMICA"],"tipo_acta": ["ORDINARIA", "EXTRAORDINARIA", "REGULARIZACION"]
+            "estado_acta": ["PENDIENTE", "GENERADA", "NO_APLICA"],"estado_tramite_alumno": ["PENDIENTE", "RESUELTO", "CON_ERROR"],"estatus_ficha_nuevo_ingreso": ["SIN_PROCESO", "SIN_PAGO", "FICHA_VENCIDA", "FICHA_CANCELADA"],"modulo_tramite": ["TRAMITES_GENERALES", "NUEVO_INGRESO"],"nivel_educativo": ["LICENCIATURA", "BACHILLERATO"],"rol_usuario": ["ADMIN", "LICENCIATURA", "BACHILLERATO", "NUEVO_INGRESO", "UNIDAD_ACADEMICA"],"tipo_acta": ["ORDINARIA", "EXTRAORDINARIA", "REGULARIZACION", "PROMOCION_GRADO", "CIERRE_CICLO"]
           }
         }
 } as const

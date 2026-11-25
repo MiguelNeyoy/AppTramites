@@ -38,6 +38,7 @@ export interface TipoTramiteCatalogo {
 export interface PeriodoEscolarCatalogo {
   id: number
   nombre: string
+  cicloEscolar?: string
   numeroPeriodo: number
   fechaInicio: string
   fechaFin: string
@@ -131,10 +132,102 @@ export function mapTipoTramiteFromDb(row: TipoTramiteRow): TipoTramiteCatalogo {
   }
 }
 
-export function mapPeriodoFromDb(row: PeriodoEscolarRow): PeriodoEscolarCatalogo {
+const CICLO_ESCOLAR_REGEX = /(\d{4})\s*-\s*(\d{4})/
+
+export function deriveCicloEscolar(params: {
+  cicloEscolar?: string | null
+  nombre: string
+  fechaInicio: string
+  numeroPeriodo: number
+}): string {
+  const raw = params.cicloEscolar?.trim()
+  if (raw) {
+    const matchRaw = raw.match(CICLO_ESCOLAR_REGEX)
+    if (matchRaw) {
+      return `${matchRaw[1]}-${matchRaw[2]}`
+    }
+  }
+
+  const matchNombre = params.nombre.match(CICLO_ESCOLAR_REGEX)
+  if (matchNombre) {
+    return `${matchNombre[1]}-${matchNombre[2]}`
+  }
+
+  const startYear = Number(params.fechaInicio.slice(0, 4))
+  if (Number.isInteger(startYear) && startYear >= 2000) {
+    return params.numeroPeriodo === 1
+      ? `${startYear}-${startYear + 1}`
+      : `${startYear - 1}-${startYear}`
+  }
+
+  return '2026-2027'
+}
+
+export function formatCicloEscolarLabel(cicloEscolar: string): string {
+  const match = cicloEscolar.match(CICLO_ESCOLAR_REGEX)
+  if (!match) {
+    return cicloEscolar
+  }
+  return `${match[1]} - ${match[2]}`
+}
+
+export function extractCiclosEscolares(
+  periodos: readonly PeriodoEscolarCatalogo[]
+): string[] {
+  const unique = new Set<string>()
+  for (const periodo of periodos) {
+    unique.add(
+      deriveCicloEscolar({
+        cicloEscolar: periodo.cicloEscolar,
+        nombre: periodo.nombre,
+        fechaInicio: periodo.fechaInicio,
+        numeroPeriodo: periodo.numeroPeriodo,
+      })
+    )
+  }
+  return [...unique].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
+}
+
+export function resolvePeriodoByCicloAndNumero(
+  periodos: readonly PeriodoEscolarCatalogo[],
+  cicloEscolar: string,
+  numeroPeriodo: number
+): PeriodoEscolarCatalogo | undefined {
+  const exact = periodos.find(
+    (p) =>
+      deriveCicloEscolar({
+        cicloEscolar: p.cicloEscolar,
+        nombre: p.nombre,
+        fechaInicio: p.fechaInicio,
+        numeroPeriodo: p.numeroPeriodo,
+      }) === cicloEscolar && p.numeroPeriodo === numeroPeriodo
+  )
+  if (exact) {
+    return exact
+  }
+  return periodos.find(
+    (p) =>
+      deriveCicloEscolar({
+        cicloEscolar: p.cicloEscolar,
+        nombre: p.nombre,
+        fechaInicio: p.fechaInicio,
+        numeroPeriodo: p.numeroPeriodo,
+      }) === cicloEscolar
+  )
+}
+
+export function mapPeriodoFromDb(
+  row: Omit<PeriodoEscolarRow, 'ciclo_escolar'> & { ciclo_escolar?: string }
+): PeriodoEscolarCatalogo {
   return {
     id: row.id,
     nombre: row.nombre,
+    cicloEscolar: deriveCicloEscolar({
+      cicloEscolar: row.ciclo_escolar,
+      nombre: row.nombre,
+      fechaInicio: row.fecha_inicio,
+      numeroPeriodo: row.numero_periodo,
+    }),
     numeroPeriodo: row.numero_periodo,
     fechaInicio: row.fecha_inicio,
     fechaFin: row.fecha_fin,

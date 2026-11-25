@@ -80,18 +80,20 @@ export function buildInitialPeriodos(): PeriodoEscolarCatalogo[] {
   return [
     {
       id: 1,
-      nombre: '2026-2027',
+      nombre: '2026-2027 Periodo 1 (Ago-Ene)',
+      cicloEscolar: '2026-2027',
       numeroPeriodo: 1,
-      fechaInicio: '2026-08-18',
+      fechaInicio: '2026-08-01',
       fechaFin: '2027-01-31',
       activo: true,
     },
     {
       id: 2,
-      nombre: '2025-2026',
+      nombre: '2026-2027 Periodo 2 (Feb-Jul)',
+      cicloEscolar: '2026-2027',
       numeroPeriodo: 2,
-      fechaInicio: '2026-02-02',
-      fechaFin: '2026-07-15',
+      fechaInicio: '2027-02-01',
+      fechaFin: '2027-07-31',
       activo: false,
     },
   ]

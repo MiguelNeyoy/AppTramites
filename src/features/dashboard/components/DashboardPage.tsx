@@ -123,7 +123,7 @@ export function DashboardPage({
             />
           ) : activeNav === 'usuarios' ? (
             <UsuariosView
-              isAdmin={!perfil || perfil.rol === 'ADMIN'}
+              isAdmin={perfil?.rol === 'ADMIN'}
               currentUserId={perfil?.id}
               refreshSignal={refreshSignal}
               onLoadingChange={setIsActiveViewLoading}

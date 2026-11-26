@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { toast } from 'sonner'
 
 import { Toaster } from '@/components/ui/sonner'
@@ -17,9 +16,8 @@ export function App() {
     clearPasswordRecovery,
     signOut,
   } = useAuth()
-  const [bypassedLogin, setBypassedLogin] = React.useState(false)
 
-  const isAuthenticated = Boolean(sessionData) || bypassedLogin
+  const isAuthenticated = Boolean(sessionData)
 
   const handleLogout = async () => {
     if (sessionData) {
@@ -31,7 +29,6 @@ export function App() {
         toast.error(mapped.message)
       }
     }
-    setBypassedLogin(false)
   }
 
   return (
@@ -50,7 +47,6 @@ export function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onLoginSuccess={(result) => setSessionData(result)}
-          onBypassLogin={() => setBypassedLogin(true)}
           isPasswordRecovery={isPasswordRecovery}
           onClearPasswordRecovery={clearPasswordRecovery}
         />

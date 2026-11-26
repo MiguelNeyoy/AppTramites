@@ -138,7 +138,9 @@ export async function requestPasswordReset(
 
   const targetRedirect =
     redirectTo ??
-    (typeof window !== 'undefined' ? window.location.origin : undefined)
+    (typeof window !== 'undefined'
+      ? new URL(import.meta.env.BASE_URL ?? '/', window.location.origin).toString()
+      : undefined)
 
   const { error } = await supabase.auth.resetPasswordForEmail(
     validation.email,

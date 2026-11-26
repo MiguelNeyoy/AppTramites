@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   AlertCircle,
-  ArrowRight,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -50,7 +49,6 @@ import { mapSupabaseError } from '@/services/shared'
 interface LoginPageProps {
   theme?: 'light' | 'dark'
   onToggleTheme?: () => void
-  onBypassLogin?: () => void
   onLoginSuccess?: (session: AuthSessionResult) => void
   isPasswordRecovery?: boolean
   onClearPasswordRecovery?: () => void
@@ -67,7 +65,6 @@ const FEATURES = [
 export function LoginPage({
   theme = 'light',
   onToggleTheme,
-  onBypassLogin,
   onLoginSuccess,
   isPasswordRecovery = false,
   onClearPasswordRecovery,
@@ -517,19 +514,6 @@ export function LoginPage({
           </CardContent>
 
           <CardFooter className="flex flex-col gap-3 pt-1 pb-5">
-            {onBypassLogin && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onBypassLogin}
-                disabled={isSubmitting}
-                className="w-full gap-2 text-xs text-muted-foreground hover:text-foreground border-dashed border-border transition-all duration-150"
-              >
-                <span>Entrar sin login (temporal)</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            )}
             <p className="text-[11px] text-muted-foreground text-center">
               Acceso restringido al personal autorizado
             </p>

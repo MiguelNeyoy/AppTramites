@@ -161,7 +161,7 @@ export function DashboardSidebar({
 
       <nav aria-label="Navegación principal" className="flex-1 space-y-3.5 px-3 py-2">
         {NAV_GROUPS.map((group) => {
-          const isAdminUser = !perfil || perfil.rol === 'ADMIN'
+          const isAdminUser = perfil?.rol === 'ADMIN'
           const visibleItems = group.items.filter(
             (item) => !item.adminOnly || isAdminUser
           )

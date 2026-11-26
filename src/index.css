@@ -1,3 +1,85 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 37.5% 96.9%;        /* #f4f6fa */
+    --foreground: 220.5 43.5% 18%;        /* #1a2742 */
+    --card: 0 0% 100%;                    /* #ffffff */
+    --card-foreground: 220.5 43.5% 18%;   /* #1a2742 */
+    --popover: 0 0% 100%;                 /* #ffffff */
+    --popover-foreground: 220.5 43.5% 18%;
+    --primary: 37.7 92.1% 50.2%;          /* #f59e0b */
+    --primary-foreground: 0 0% 100%;      /* #ffffff */
+    --secondary: 220 48.4% 93.9%;         /* #e8edf7 */
+    --secondary-foreground: 220.5 43.5% 18%;
+    --muted: 222 41.7% 95.3%;             /* #eef1f8 */
+    --muted-foreground: 215.4 16.3% 46.9%; /* #64748b */
+    --accent: 217.4 68.4% 37.3%;          /* #1e4fa0 */
+    --accent-foreground: 0 0% 100%;       /* #ffffff */
+    --destructive: 0 72.2% 50.6%;         /* #dc2626 */
+    --destructive-foreground: 0 0% 100%;  /* #ffffff */
+    --border: 218.2 23.4% 90.8%;          /* ~rgba(0, 0, 0, 0.08) sobre #f4f6fa/#ffffff */
+    --input: 218.2 23.4% 90.8%;
+    --ring: 37.7 92.1% 50.2%;             /* #f59e0b */
+    --chart-1: 217.4 68.4% 37.3%;         /* #1e4fa0 */
+    --chart-2: 262.1 83.3% 57.8%;         /* #7c3aed */
+    --chart-3: 161.4 93.5% 30.4%;         /* #059669 */
+    --chart-4: 37.7 92.1% 50.2%;          /* #f59e0b */
+    --chart-5: 191.6 91.4% 36.5%;         /* #0891b2 */
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 220.9 39.3% 11%;        /* #111827 */
+    --foreground: 220 13% 91%;            /* #e5e7eb */
+    --card: 219.2 35.1% 14.5%;            /* #182132 */
+    --card-foreground: 220 13% 91%;       /* #e5e7eb */
+    --popover: 219.2 35.1% 14.5%;         /* #182132 */
+    --popover-foreground: 220 13% 91%;
+    --primary: 37.7 92.1% 50.2%;          /* #f59e0b */
+    --primary-foreground: 0 0% 100%;      /* #ffffff */
+    --secondary: 217.5 30.8% 20.4%;       /* #243044 */
+    --secondary-foreground: 220 13% 91%;
+    --muted: 218 31.9% 18.4%;             /* #202b3e */
+    --muted-foreground: 215 20.2% 65.1%;  /* #94a3b8 */
+    --accent: 217.2 91.2% 59.8%;          /* #3b82f6 */
+    --accent-foreground: 0 0% 100%;       /* #ffffff */
+    --destructive: 0 84.2% 60.2%;         /* #ef4444 */
+    --destructive-foreground: 0 0% 100%;  /* #ffffff */
+    --border: 217.5 26.2% 23.9%;          /* ~rgba(226, 232, 240, 0.12) sobre #182132 */
+    --input: 217.5 26.2% 23.9%;
+    --ring: 37.7 92.1% 50.2%;             /* #f59e0b */
+    --chart-1: 213.1 93.9% 67.8%;         /* #60a5fa */
+    --chart-2: 255.1 91.7% 76.3%;         /* #a78bfa */
+    --chart-3: 158.1 64.4% 51.6%;         /* #34d399 */
+    --chart-4: 37.7 92.1% 50.2%;          /* #f59e0b */
+    --chart-5: 187.9 85.7% 53.3%;         /* #22d3ee */
+  }
+
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Scrollbars finos según DESIGN.md */
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.35);
+    border-radius: 9999px;
+  }
+}
